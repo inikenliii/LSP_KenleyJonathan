@@ -4,4 +4,5 @@
 export * from './authSchemas';
 export * from './garageSchemas';
 export * from './parse';
+export * from './rentalSchemas';
 export * from './verificationSchemas';

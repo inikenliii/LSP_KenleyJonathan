@@ -10,6 +10,15 @@ export {
   type IGarageService,
 } from './GarageService';
 export {
+  RentalService,
+  type AvailableGarageOption,
+  type IRentalService,
+  type NewRentalOptions,
+  type PaymentProofFile,
+  type ProofViewer,
+  type RentalView,
+} from './RentalService';
+export {
   VerificationService,
   type IVerificationService,
   type VerificationResult,

@@ -1,8 +1,10 @@
 import 'server-only';
 import { BcryptPasswordHasher } from '@/lib/password-hasher';
 import { prisma } from '@/lib/db';
+import { LocalPaymentProofStorage } from '@/lib/payment-proof-storage';
 import {
   GarageRepository,
+  RentalRepository,
   SessionRepository,
   UserRepository,
   type ISessionRepository,
@@ -10,9 +12,11 @@ import {
 import {
   AuthService,
   GarageService,
+  RentalService,
   VerificationService,
   type IAuthService,
   type IGarageService,
+  type IRentalService,
   type IVerificationService,
 } from '@/services';
 
@@ -40,3 +44,9 @@ export const verificationService: IVerificationService = new VerificationService
 
 /** Layanan garasi di atas repository garasi. */
 export const garageService: IGarageService = new GarageService(new GarageRepository(prisma));
+
+/** Layanan sewa di atas repository sewa dan penyimpanan bukti pembayaran lokal. */
+export const rentalService: IRentalService = new RentalService(
+  new RentalRepository(prisma),
+  new LocalPaymentProofStorage(),
+);

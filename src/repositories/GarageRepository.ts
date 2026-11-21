@@ -1,6 +1,7 @@
 /**
- * @file Repository garasi: satu-satunya kelas yang membaca dan menulis tabel
- * garages dan garage_type_configs lewat Prisma.
+ * @file Repository garasi: membaca dan menulis tabel garages dan
+ * garage_type_configs lewat Prisma. Perubahan status garasi akibat penyewaan
+ * ada di RentalRepository agar satu transaksi dengan baris sewanya.
  */
 import type { BatchPlan } from '@/domain';
 import type { PrismaClient } from '@/generated/client';
