@@ -8,6 +8,7 @@ const ADMIN_LINKS: ReadonlyArray<NavLink> = [
   { href: '/admin/pendaftar', label: 'Pendaftar' },
   { href: '/admin/garasi', label: 'Garasi' },
   { href: '/admin/perpanjangan', label: 'Perpanjangan' },
+  { href: '/admin/laporan', label: 'Laporan' },
 ];
 
 /**
