@@ -303,3 +303,19 @@ describe('detectProofImageType', () => {
     expect(PROOF_CONTENT_TYPES.webp).toBe('image/webp');
   });
 });
+
+describe('calculateRentalCost sewa harian mobil listrik', () => {
+  it('harian di garasi mobil listrik = hari x harga harian + (kapasitas - sisa) x harga per kWh: 2 x 60000 + 40 kWh x 2000 = 200000', () => {
+    expect(
+      calculateRentalCost({
+        rentalType: 'HARIAN',
+        days: 2,
+        dailyPrice: 60000,
+        chargesBattery: true,
+        batteryKwh: 50,
+        remainingKwh: 10,
+        pricePerKwh: 2000,
+      }),
+    ).toEqual({ rentalCost: 120000, chargeCost: 80000, totalCost: 200000 });
+  });
+});

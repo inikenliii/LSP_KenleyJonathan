@@ -7,6 +7,7 @@ import {
   Bicycle,
   Car,
   ElectricCar,
+  GARAGE_TYPE_CODES,
   Motorcycle,
   VEHICLE_TYPE_CODES,
   ValidationError,
@@ -90,5 +91,49 @@ describe('canParkIn dan chargesBatteryIn', () => {
     expect(new ElectricCar().chargesBatteryIn('CAR')).toBe(false);
     expect(new Car().chargesBatteryIn('ELECTRIC_CAR')).toBe(false);
     expect(new Bicycle().chargesBatteryIn('ELECTRIC_CAR')).toBe(false);
+  });
+});
+
+describe('matriks kecocokan kendaraan dan tipe garasi', () => {
+  it('canParkIn: 4 tipe kendaraan x 3 tipe garasi sesuai aturan kecocokan', () => {
+    const diharapkan = {
+      SEPEDA: { BICYCLE: true, CAR: false, ELECTRIC_CAR: false },
+      SEPEDA_MOTOR: { BICYCLE: true, CAR: false, ELECTRIC_CAR: false },
+      MOBIL: { BICYCLE: false, CAR: true, ELECTRIC_CAR: false },
+      MOBIL_LISTRIK: { BICYCLE: false, CAR: true, ELECTRIC_CAR: true },
+    };
+    const aktual = Object.fromEntries(
+      VEHICLE_TYPE_CODES.map((kendaraan) => [
+        kendaraan,
+        Object.fromEntries(
+          GARAGE_TYPE_CODES.map((garasi) => [
+            garasi,
+            VehicleFactory.create(kendaraan).canParkIn(garasi),
+          ]),
+        ),
+      ]),
+    );
+    expect(aktual).toEqual(diharapkan);
+  });
+
+  it('chargesBatteryIn: hanya Mobil Listrik di garasi Mobil Listrik dari 12 kombinasi', () => {
+    const diharapkan = {
+      SEPEDA: { BICYCLE: false, CAR: false, ELECTRIC_CAR: false },
+      SEPEDA_MOTOR: { BICYCLE: false, CAR: false, ELECTRIC_CAR: false },
+      MOBIL: { BICYCLE: false, CAR: false, ELECTRIC_CAR: false },
+      MOBIL_LISTRIK: { BICYCLE: false, CAR: false, ELECTRIC_CAR: true },
+    };
+    const aktual = Object.fromEntries(
+      VEHICLE_TYPE_CODES.map((kendaraan) => [
+        kendaraan,
+        Object.fromEntries(
+          GARAGE_TYPE_CODES.map((garasi) => [
+            garasi,
+            VehicleFactory.create(kendaraan).chargesBatteryIn(garasi),
+          ]),
+        ),
+      ]),
+    );
+    expect(aktual).toEqual(diharapkan);
   });
 });
