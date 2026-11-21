@@ -46,6 +46,21 @@ function pesan(input: Record<string, unknown>, field: string): string | undefine
 }
 
 describe('createRentalSchema: sisa baterai mobil listrik', () => {
+  it('menerima kapasitas dan sisa baterai sampai batas Decimal(5,1)', () => {
+    for (const nilai of ['1000.0', '9999.9']) {
+      expect(
+        schema.safeParse(isianListrik({ batteryKwh: nilai, remainingKwh: nilai })).success,
+      ).toBe(true);
+    }
+
+    expect(pesan(isianListrik({ batteryKwh: '10000.0' }), 'batteryKwh')).toBe(
+      'Kapasitas baterai berupa angka positif dengan paling banyak satu desimal',
+    );
+    expect(
+      pesan(isianListrik({ batteryKwh: '9999.9', remainingKwh: '10000.0' }), 'remainingKwh'),
+    ).toBe('Sisa baterai berupa angka nol atau lebih dengan paling banyak satu desimal');
+  });
+
   it('menerima sisa 0, sisa sama dengan kapasitas, dan koma desimal', () => {
     for (const sisa of ['0', '60', '12,5']) {
       expect(schema.safeParse(isianListrik({ remainingKwh: sisa })).success).toBe(true);

@@ -86,13 +86,13 @@ export function createRentalSchema(maxDays: number) {
           .optional(),
         batteryKwh: z
           .string({ error: PESAN_BATERAI })
-          .regex(/^\d{1,3}(\.\d)?$/, { error: PESAN_BATERAI })
+          .regex(/^\d{1,4}(\.\d)?$/, { error: PESAN_BATERAI })
           .transform(Number)
           .refine((nilai) => nilai > 0, { error: PESAN_BATERAI })
           .optional(),
         remainingKwh: z
           .string({ error: PESAN_SISA })
-          .regex(/^\d{1,3}(\.\d)?$/, { error: PESAN_SISA })
+          .regex(/^\d{1,4}(\.\d)?$/, { error: PESAN_SISA })
           .transform(Number)
           .optional(),
         rentalType: z.enum(RENTAL_TYPE_CODES, { error: 'Pilih tipe sewa' }),
