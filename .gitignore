@@ -21,3 +21,6 @@ coverage/
 next-env.d.ts
 *.tsbuildinfo
 out/
+
+# Dokumentasi API hasil TypeDoc (dibuat ulang dengan npm run docs)
+docs/api/

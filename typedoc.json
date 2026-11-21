@@ -1,0 +1,20 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "Aplikasi Penyewaan Garasi - Dokumentasi API",
+  "entryPoints": [
+    "src/domain",
+    "src/services",
+    "src/repositories",
+    "src/validation",
+    "src/lib"
+  ],
+  "entryPointStrategy": "expand",
+  "exclude": [
+    "src/generated/**",
+    "src/components/ui/**",
+    "**/*.test.ts"
+  ],
+  "out": "docs/api",
+  "tsconfig": "tsconfig.json",
+  "readme": "none"
+}
