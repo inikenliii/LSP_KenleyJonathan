@@ -3,7 +3,11 @@ import { SiteHeader, type NavLink } from '@/components/layout/SiteHeader';
 import { requireRole } from '@/lib/auth/dal';
 
 /** Tautan navigasi area Penyewa. */
-const RENTER_LINKS: ReadonlyArray<NavLink> = [{ href: '/penyewa', label: 'Beranda' }];
+const RENTER_LINKS: ReadonlyArray<NavLink> = [
+  { href: '/penyewa', label: 'Beranda' },
+  { href: '/penyewa/sewa/baru', label: 'Sewa Baru' },
+  { href: '/penyewa/sewa', label: 'Sewa Saya' },
+];
 
 /**
  * Kerangka area Penyewa. Hanya Penyewa yang sudah diterima yang boleh membuka
