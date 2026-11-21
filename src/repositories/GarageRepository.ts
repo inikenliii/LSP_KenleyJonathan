@@ -4,7 +4,12 @@
  */
 import type { BatchPlan } from '@/domain';
 import type { PrismaClient } from '@/generated/client';
-import type { GarageBatchRequest, IGarageRepository } from './IGarageRepository';
+import type {
+  GarageBatchRequest,
+  GarageRecord,
+  GarageTypeConfigRecord,
+  IGarageRepository,
+} from './IGarageRepository';
 
 /** Implementasi IGarageRepository dengan Prisma. */
 export class GarageRepository implements IGarageRepository {
@@ -12,6 +17,36 @@ export class GarageRepository implements IGarageRepository {
    * @param prisma Klien Prisma.
    */
   constructor(private readonly prisma: PrismaClient) {}
+
+  /**
+   * Membaca konfigurasi semua tipe garasi.
+   *
+   * @returns Satu konfigurasi per tipe, tanpa urutan tertentu.
+   */
+  async findAllConfigs(): Promise<GarageTypeConfigRecord[]> {
+    return this.prisma.garageTypeConfig.findMany({
+      select: { type: true, dailyPrice: true, pricePerKwh: true, lastNumber: true },
+    });
+  }
+
+  /**
+   * Membaca semua garasi beserta harga tipenya, urut menurut ID.
+   *
+   * @returns Semua garasi sebagai data biasa.
+   */
+  async findAll(): Promise<GarageRecord[]> {
+    const baris = await this.prisma.garage.findMany({
+      orderBy: { id: 'asc' },
+      include: { config: { select: { dailyPrice: true, pricePerKwh: true } } },
+    });
+    return baris.map((garasi) => ({
+      id: garasi.id,
+      type: garasi.type,
+      status: garasi.status,
+      dailyPrice: garasi.config.dailyPrice,
+      pricePerKwh: garasi.config.pricePerKwh,
+    }));
+  }
 
   /**
    * Membuat satu batch garasi dalam satu transaksi. Penghitung nomor tipe

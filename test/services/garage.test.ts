@@ -157,3 +157,75 @@ describe('GarageService.createBatch', () => {
     expect(hasil.lastId).toBe('S999');
   });
 });
+
+describe('GarageService.getTypeConfigs', () => {
+  it('mengembalikan tiga tipe berurutan BICYCLE, CAR, ELECTRIC_CAR dengan harga bulanan dan kuota', async () => {
+    await service.createBatch({ type: 'BICYCLE', quantity: '3', dailyPrice: '10000' });
+
+    const konfigurasi = await service.getTypeConfigs();
+
+    expect(konfigurasi.map((k) => k.code)).toEqual(['BICYCLE', 'CAR', 'ELECTRIC_CAR']);
+    expect(konfigurasi[0]).toMatchObject({
+      label: 'Sepeda',
+      prefix: 'S',
+      usesKwhPrice: false,
+      dailyPrice: 10000,
+      monthlyPrice: 250000,
+      totalCreated: 3,
+      remainingQuota: 996,
+    });
+    expect(konfigurasi[1].monthlyPrice).toBeNull();
+    expect(konfigurasi[2]).toMatchObject({ usesKwhPrice: true, remainingQuota: 999 });
+  });
+});
+
+describe('GarageService.listGarages', () => {
+  it('mengurutkan menurut ID dan menghitung harga bulanan 25 x harian', async () => {
+    await service.createBatch({
+      type: 'ELECTRIC_CAR',
+      quantity: '1',
+      dailyPrice: '50000',
+      pricePerKwh: '2500',
+    });
+    await service.createBatch({ type: 'BICYCLE', quantity: '2', dailyPrice: '10000' });
+
+    const daftar = await service.listGarages();
+
+    expect(daftar.map((g) => g.id)).toEqual(['E001', 'S001', 'S002']);
+    expect(daftar[1]).toMatchObject({
+      typeLabel: 'Sepeda',
+      dailyPrice: 10000,
+      monthlyPrice: 250000,
+      pricePerKwh: null,
+      status: 'AVAILABLE',
+      statusLabel: 'tersedia',
+    });
+  });
+
+  it('harga per kWh hanya muncul untuk Mobil Listrik', async () => {
+    await service.createBatch({
+      type: 'ELECTRIC_CAR',
+      quantity: '1',
+      dailyPrice: '50000',
+      pricePerKwh: '2500',
+    });
+    await service.createBatch({ type: 'CAR', quantity: '1', dailyPrice: '30000' });
+
+    const daftar = await service.listGarages();
+    const listrik = daftar.find((g) => g.id === 'E001');
+    const mobil = daftar.find((g) => g.id === 'C001');
+
+    expect(listrik?.pricePerKwh).toBe(2500);
+    expect(mobil?.pricePerKwh).toBeNull();
+  });
+
+  it('garasi berstatus USED berlabel "used"', async () => {
+    await service.createBatch({ type: 'BICYCLE', quantity: '2', dailyPrice: '10000' });
+    await prisma.garage.update({ where: { id: 'S002' }, data: { status: 'USED' } });
+
+    const daftar = await service.listGarages();
+
+    expect(daftar.find((g) => g.id === 'S001')?.statusLabel).toBe('tersedia');
+    expect(daftar.find((g) => g.id === 'S002')?.statusLabel).toBe('used');
+  });
+});
