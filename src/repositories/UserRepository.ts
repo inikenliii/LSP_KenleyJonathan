@@ -3,7 +3,7 @@
  */
 import { DuplicateUserError, User } from '@/domain';
 import { Prisma, type PrismaClient } from '@/generated/client';
-import type { IUserRepository, NewUserData } from './IUserRepository';
+import type { IUserRepository, NewUserData, UserAuthRecord } from './IUserRepository';
 
 /** Implementasi IUserRepository dengan Prisma. */
 export class UserRepository implements IUserRepository {
@@ -77,5 +77,37 @@ export class UserRepository implements IUserRepository {
       }
       throw error;
     }
+  }
+
+  /**
+   * Mengambil pengguna beserta hash password untuk pemeriksaan login.
+   *
+   * @param email Email (sudah huruf kecil).
+   * @returns Pengguna dan hash passwordnya, atau `null` bila email tidak terdaftar.
+   */
+  async findAuthRecordByEmail(email: string): Promise<UserAuthRecord | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { email },
+      select: { ...UserRepository.PUBLIC_SELECT, passwordHash: true },
+    });
+    if (row === null) {
+      return null;
+    }
+    const { passwordHash, ...kolomPublik } = row;
+    return { user: UserRepository.toDomain(kolomPublik), passwordHash };
+  }
+
+  /**
+   * Mengambil pengguna berdasarkan id.
+   *
+   * @param id Id pengguna.
+   * @returns Pengguna, atau `null` bila tidak ada.
+   */
+  async findById(id: number): Promise<User | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { id },
+      select: UserRepository.PUBLIC_SELECT,
+    });
+    return row === null ? null : UserRepository.toDomain(row);
   }
 }

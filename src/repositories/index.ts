@@ -1,5 +1,7 @@
 /**
  * @file Pintu masuk paket repository.
  */
-export type { IUserRepository, NewUserData } from './IUserRepository';
+export type { ISessionRepository } from './ISessionRepository';
+export type { IUserRepository, NewUserData, UserAuthRecord } from './IUserRepository';
+export { SessionRepository } from './SessionRepository';
 export { UserRepository } from './UserRepository';

@@ -44,3 +44,15 @@ export const registrationSchema = z.object({
 
 /** Data pendaftaran setelah divalidasi dan dirapikan. */
 export type RegistrationInput = z.output<typeof registrationSchema>;
+
+/** Skema data masuk: email dirapikan, password hanya dicek tidak kosong dan tidak melebihi batas bcrypt. */
+export const loginSchema = z.object({
+  email: emailField,
+  password: z
+    .string({ error: 'Password wajib diisi' })
+    .min(1, { error: 'Password wajib diisi' })
+    .max(72, { error: 'Password wajib diisi' }),
+});
+
+/** Data masuk setelah divalidasi dan dirapikan. */
+export type LoginInput = z.output<typeof loginSchema>;

@@ -14,6 +14,12 @@ export interface NewUserData {
   verificationStatus: VerificationStatus;
 }
 
+/** Pengguna beserta hash passwordnya; hanya dipakai layanan saat memeriksa login. */
+export interface UserAuthRecord {
+  user: User;
+  passwordHash: string;
+}
+
 /** Kontrak repository pengguna agar layanan tidak bergantung pada Prisma. */
 export interface IUserRepository {
   /**
@@ -40,4 +46,21 @@ export interface IUserRepository {
    * @throws {DuplicateUserError} Bila email atau NIK sudah dipakai.
    */
   create(data: NewUserData): Promise<User>;
+
+  /**
+   * Mengambil pengguna beserta hash password untuk pemeriksaan login. Satu-satunya
+   * query yang ikut membaca hash.
+   *
+   * @param email Email (sudah huruf kecil).
+   * @returns Pengguna dan hash passwordnya, atau `null` bila email tidak terdaftar.
+   */
+  findAuthRecordByEmail(email: string): Promise<UserAuthRecord | null>;
+
+  /**
+   * Mengambil pengguna berdasarkan id (tanpa hash password).
+   *
+   * @param id Id pengguna.
+   * @returns Pengguna, atau `null` bila tidak ada.
+   */
+  findById(id: number): Promise<User | null>;
 }
