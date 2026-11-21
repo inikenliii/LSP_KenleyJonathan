@@ -60,7 +60,7 @@ export class LocalPaymentProofStorage implements IPaymentProofStorage {
   async save(bytes: Uint8Array, type: ProofImageType): Promise<string> {
     await mkdir(this.directory, { recursive: true });
     const nama = `${randomUUID()}.${type}`;
-    await writeFile(path.join(this.directory, nama), bytes, { flag: 'wx' });
+    await writeFile(path.join(/*turbopackIgnore: true*/ this.directory, nama), bytes, { flag: 'wx' });
     return nama;
   }
 
@@ -104,6 +104,6 @@ export class LocalPaymentProofStorage implements IPaymentProofStorage {
     if (!LocalPaymentProofStorage.NAME_PATTERN.test(fileName)) {
       throw new NotFoundError('Bukti pembayaran tidak ditemukan.');
     }
-    return path.join(this.directory, fileName);
+    return path.join(/*turbopackIgnore: true*/ this.directory, fileName);
   }
 }
