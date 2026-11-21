@@ -95,6 +95,19 @@ export class AuthenticationError extends AppError {
   }
 }
 
+/**
+ * Terlalu banyak percobaan masuk dalam waktu singkat. Pesannya tidak menyebut
+ * apakah akun ada atau tidak, sama untuk semua email.
+ */
+export class TooManyAttemptsError extends AppError {
+  /**
+   * @param message Pesan umum untuk pengguna.
+   */
+  constructor(message = 'Terlalu banyak percobaan masuk. Coba lagi beberapa menit lagi.') {
+    super(message, 'TOO_MANY_ATTEMPTS');
+  }
+}
+
 /** Akun belum boleh masuk karena belum diterima admin. */
 export class AccountNotVerifiedError extends AppError {
   /** Status verifikasi akun saat ditolak masuk. */

@@ -14,6 +14,20 @@ export const emailField = z
   .max(254, { error: 'Format email tidak valid' })
   .pipe(z.email({ error: 'Format email tidak valid' }));
 
+/** Batas panjang password dalam byte: bcrypt hanya memakai 72 byte pertama. */
+export const PASSWORD_MAX_BYTES = 72;
+
+/**
+ * Memeriksa panjang teks dalam byte UTF-8. Karakter non-ASCII (huruf beraksen, emoji)
+ * memakai lebih dari satu byte, jadi 72 karakter bisa melebihi batas bcrypt.
+ *
+ * @param nilai Teks yang diperiksa.
+ * @returns `true` bila panjangnya paling banyak 72 byte.
+ */
+function withinPasswordBytes(nilai: string): boolean {
+  return Buffer.byteLength(nilai, 'utf8') <= PASSWORD_MAX_BYTES;
+}
+
 /** Skema data pendaftaran penyewa. */
 export const registrationSchema = z.object({
   // Spasi dibuang dahulu, lalu harus tepat 16 digit angka.
@@ -39,7 +53,10 @@ export const registrationSchema = z.object({
   password: z
     .string({ error: 'Password harus 8-72 karakter' })
     .min(8, { error: 'Password harus 8-72 karakter' })
-    .max(72, { error: 'Password harus 8-72 karakter' }),
+    .max(72, { error: 'Password harus 8-72 karakter' })
+    .refine(withinPasswordBytes, {
+      error: 'Password paling panjang 72 byte (sekitar 72 karakter biasa)',
+    }),
 });
 
 /** Data pendaftaran setelah divalidasi dan dirapikan. */
@@ -51,7 +68,8 @@ export const loginSchema = z.object({
   password: z
     .string({ error: 'Password wajib diisi' })
     .min(1, { error: 'Password wajib diisi' })
-    .max(72, { error: 'Password wajib diisi' }),
+    .max(72, { error: 'Password wajib diisi' })
+    .refine(withinPasswordBytes, { error: 'Password wajib diisi' }),
 });
 
 /** Data masuk setelah divalidasi dan dirapikan. */

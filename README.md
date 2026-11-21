@@ -10,7 +10,7 @@ Aplikasi web penyewaan garasi kendaraan (sepeda, mobil, dan mobil listrik) denga
 ## Instalasi
 
 1. Jalankan `npm install`.
-2. Salin `.env.example` menjadi `.env`, lalu isi `DATABASE_URL`, `TEST_DATABASE_URL` (nama database harus berakhiran `_test`), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, dan `ADMIN_NAME`.
+2. Salin `.env.example` menjadi `.env`, lalu isi `DATABASE_URL`, `TEST_DATABASE_URL` (nama database harus berakhiran `_test`), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, dan `ADMIN_NAME`. Secara opsional atur `AUTH_RATE_LIMIT_MAX` (batas percobaan masuk per email dalam 15 menit, bawaan 10).
 3. Jalankan `npm run setup` untuk membuat tabel dan akun Admin.
 
 ## Menjalankan

@@ -1,6 +1,7 @@
 import 'server-only';
 import { BcryptPasswordHasher } from '@/lib/password-hasher';
 import { prisma } from '@/lib/db';
+import { LoginRateLimiter, readLoginRateLimitMax } from '@/lib/login-rate-limiter';
 import { LocalPaymentProofStorage } from '@/lib/payment-proof-storage';
 import {
   GarageRepository,
@@ -39,8 +40,18 @@ export const userRepository = new UserRepository(prisma);
 /** Pengaman password bcrypt. */
 export const passwordHasher = new BcryptPasswordHasher();
 
-/** Layanan autentikasi dengan repository dan pengaman password di atas. */
-export const authService: IAuthService = new AuthService(userRepository, passwordHasher);
+/**
+ * Pembatas percobaan masuk di memori: 15 menit, batas dari `AUTH_RATE_LIMIT_MAX`
+ * (bawaan 10). Hitungannya per proses dan hilang saat server dimulai ulang.
+ */
+export const loginRateLimiter = new LoginRateLimiter({ maxAttempts: readLoginRateLimitMax() });
+
+/** Layanan autentikasi dengan repository, pengaman password, dan pembatas percobaan di atas. */
+export const authService: IAuthService = new AuthService(
+  userRepository,
+  passwordHasher,
+  loginRateLimiter,
+);
 
 /** Repository sesi login pada tabel session. */
 export const sessionRepository: ISessionRepository = new SessionRepository(prisma);

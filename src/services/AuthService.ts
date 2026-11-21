@@ -5,14 +5,22 @@ import {
   AccountNotVerifiedError,
   AuthenticationError,
   DuplicateUserError,
+  TooManyAttemptsError,
   USER_ROLE,
   VERIFICATION_STATUS,
   toAppError,
   type UserDTO,
 } from '@/domain';
+import { buildLoginRateKey, type LoginRateLimiter } from '@/lib/login-rate-limiter';
 import type { IPasswordHasher } from '@/lib/password-hasher';
 import type { IUserRepository } from '@/repositories';
 import { loginSchema, parseInput, registrationSchema } from '@/validation';
+
+/** Keterangan tambahan permintaan masuk yang tidak berasal dari formulir. */
+export interface AuthenticateContext {
+  /** Alamat IP klien bila diketahui; dipakai bersama email sebagai kunci pembatas percobaan. */
+  clientIp?: string | null;
+}
 
 /** Kontrak layanan autentikasi. */
 export interface IAuthService {
@@ -31,13 +39,15 @@ export interface IAuthService {
    * Memeriksa email dan password untuk masuk.
    *
    * @param input Data formulir masuk (belum divalidasi).
+   * @param context Keterangan permintaan, misalnya alamat IP klien untuk pembatasan percobaan.
    * @returns Pengguna yang boleh masuk.
    * @throws {ValidationError} Bila data tidak valid.
+   * @throws {TooManyAttemptsError} Bila percobaan masuk melewati batas dalam jendela waktunya.
    * @throws {AuthenticationError} Bila email tidak terdaftar atau password salah.
    * @throws {AccountNotVerifiedError} Bila password benar tetapi akun belum diterima admin.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
    */
-  authenticate(input: unknown): Promise<UserDTO>;
+  authenticate(input: unknown, context?: AuthenticateContext): Promise<UserDTO>;
 }
 
 /**
@@ -48,10 +58,12 @@ export class AuthService implements IAuthService {
   /**
    * @param users Repository pengguna.
    * @param hasher Pengaman password.
+   * @param limiter Pembatas percobaan masuk (di memori); bila kosong, percobaan tidak dibatasi.
    */
   constructor(
     private readonly users: IUserRepository,
     private readonly hasher: IPasswordHasher,
+    private readonly limiter?: LoginRateLimiter,
   ) {}
 
   /** Hash pembanding untuk email tak dikenal, dibuat sekali pada pemakaian pertama. */
@@ -107,15 +119,25 @@ export class AuthService implements IAuthService {
    * Memeriksa email dan password. Pesan gagal sama untuk email tak dikenal dan
    * password salah; status verifikasi baru terbuka setelah password benar.
    *
+   * Bila pembatas dipasang, tiap percobaan dihitung per kunci email (dan IP bila ada)
+   * sebelum password diperiksa, sehingga akun yang ada dan yang tidak ada diperlakukan
+   * sama. Hitungan dihapus begitu password benar. Hitungan disimpan di memori proses.
+   *
    * @param input Data formulir masuk (belum divalidasi).
+   * @param context Keterangan permintaan, misalnya alamat IP klien.
    * @returns Pengguna yang boleh masuk.
    * @throws {ValidationError} Bila data tidak valid.
+   * @throws {TooManyAttemptsError} Bila percobaan melewati batas dalam jendela waktunya.
    * @throws {AuthenticationError} Bila email tidak terdaftar atau password salah.
    * @throws {AccountNotVerifiedError} Bila password benar tetapi akun belum diterima admin.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
    */
-  async authenticate(input: unknown): Promise<UserDTO> {
+  async authenticate(input: unknown, context: AuthenticateContext = {}): Promise<UserDTO> {
     const data = parseInput(loginSchema, input);
+    const kunci = buildLoginRateKey(data.email, context.clientIp);
+    if (this.limiter !== undefined && !this.limiter.tryConsume(kunci)) {
+      throw new TooManyAttemptsError();
+    }
     try {
       const record = await this.users.findAuthRecordByEmail(data.email);
       if (record === null) {
@@ -125,6 +147,7 @@ export class AuthService implements IAuthService {
       if (!(await this.hasher.verify(data.password, record.passwordHash))) {
         throw new AuthenticationError();
       }
+      this.limiter?.reset(kunci);
       if (!record.user.canAccessSystem()) {
         throw new AccountNotVerifiedError(record.user.verificationStatus);
       }

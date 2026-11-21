@@ -1,7 +1,7 @@
 /**
  * @file Pintu masuk paket layanan.
  */
-export { AuthService, type IAuthService } from './AuthService';
+export { AuthService, type AuthenticateContext, type IAuthService } from './AuthService';
 export {
   GarageService,
   type GarageBatchResult,
