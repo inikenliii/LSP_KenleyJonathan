@@ -175,6 +175,7 @@ Penyewa yang sudah diterima memilih sewa harian atau bulanan, mengisi data kenda
 ### 6.6 Sewa Saya
 
 Daftar sewa milik Penyewa beserta tanggal mulai dan berakhir, biaya, status, dan tautan bukti pembayaran.
+ Total biaya sebuah sewa sudah termasuk semua perpanjangannya, dengan keterangan "termasuk perpanjangan" di bawah angkanya. Perpanjangan ditampilkan sebagai daftar di bawah sewa yang bersangkutan, lengkap dengan jenis dan jumlahnya, tanggal selesai baru, biaya, dan tautan "Lihat bukti".
 
 ![Halaman Sewa Saya](tangkapan-layar/07-sewa-saya.png)
 
@@ -198,7 +199,7 @@ Admin melihat laporan penyewaan dalam empat tampilan: per bulan (jumlah sewa dan
 
 ## 7. Skenario Unit Testing
 
-Unit test dibuat dengan Vitest dan dijalankan dengan perintah `npm test`. Hasil proses terakhir: 222 dari 222 tes lulus (18 berkas tes). Tes pada folder `test/unit` menguji fungsi dan kelas domain tanpa database, sedangkan tes pada folder `test/services` menguji layanan dengan database PostgreSQL terpisah yang namanya berakhiran `_test`. Tabel berikut memuat 31 skenario yang mewakili seluruh aturan bisnis; daftar 99 skenario terpilih ada di `docs/skenario-pengujian.md`.
+Unit test dibuat dengan Vitest dan dijalankan dengan perintah `npm test`. Hasil proses terakhir: 255 dari 255 tes lulus (22 berkas tes). Tes pada folder `test/unit` menguji fungsi dan kelas domain tanpa database, sedangkan tes pada folder `test/services` menguji layanan dengan database PostgreSQL terpisah yang namanya berakhiran `_test`. Tabel berikut memuat 31 skenario yang mewakili seluruh aturan bisnis; daftar 99 skenario terpilih ada di `docs/skenario-pengujian.md`.
 
 | ID | Kelas / Method | Skenario | Input | Hasil yang Diharapkan | Hasil Aktual | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -260,3 +261,7 @@ Ketentuan berikut adalah asumsi dan keputusan yang tidak ditetapkan secara rinci
 | 8 | Laporan penyewaan mengelompokkan sebuah sewa menurut tanggal mulainya, dengan jumlah uang sama dengan total biaya sewa ditambah semua biaya perpanjangannya. |
 | 9 | Bukti pembayaran wajib diunggah, berupa gambar JPEG, PNG, atau WebP (dikenali dari isi berkas) dengan ukuran paling besar 2 MB, dan disimpan di luar folder publik aplikasi. |
 | 10 | Tidak ada tambahan atau potongan biaya selain aturan tertulis di atas: total biaya sama dengan biaya sewa ditambah biaya pengisian listrik (bila ada). |
+| 11 | Percobaan masuk dibatasi per kombinasi email dan alamat IP: setelah melewati batas, percobaan berikutnya ditolak sampai jendela waktunya berakhir. Batas ini disimpan di memori server, bawaannya 10 percobaan per 15 menit, dan dapat diatur dengan variabel lingkungan `AUTH_RATE_LIMIT_MAX`. |
+| 12 | Password paling panjang 72 byte karena batas algoritma bcrypt; panjangnya dihitung dalam byte, bukan jumlah karakter. |
+| 13 | Isian angka hanya menerima digit biasa; bentuk seperti heksadesimal, eksponen, atau tanda plus ditolak. |
+| 14 | Setiap respons membawa header keamanan (X-Frame-Options, X-Content-Type-Options nosniff, Referrer-Policy, dan Content-Security-Policy dengan frame-ancestors), dan header X-Powered-By dimatikan. |
