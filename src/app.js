@@ -11,6 +11,9 @@ import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import { csrfSync } from 'csrf-sync';
 import { env } from './config/env.js';
+import { UserRepository } from './repositories/UserRepository.js';
+import { AuthService } from './services/AuthService.js';
+import { AuthController } from './controllers/AuthController.js';
 import { createRouter } from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
@@ -112,7 +115,10 @@ export function createApp({ prisma, pgPool }) {
 
   app.use(csrfSynchronisedProtection);
 
-  const controllers = {};
+  // Repository -> service -> controller disusun di sini (composition root).
+  const userRepository = new UserRepository(prisma);
+  const authService = new AuthService(userRepository);
+  const controllers = { auth: new AuthController(authService) };
   app.use(createRouter(controllers));
 
   app.use(notFoundHandler);

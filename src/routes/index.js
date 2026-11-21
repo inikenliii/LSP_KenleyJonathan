@@ -16,5 +16,8 @@ export function createRouter(controllers = {}) {
     res.render('home');
   });
 
+  router.get('/register', controllers.auth.showRegister);
+  router.post('/register', controllers.auth.register);
+
   return router;
 }

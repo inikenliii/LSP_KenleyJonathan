@@ -1,0 +1,67 @@
+{% extends "layout.njk" %}
+
+{% block title %}Daftar Penyewa - {{ appName }}{% endblock %}
+
+{% block content %}
+<h1>Daftar Penyewa</h1>
+<p>Isi data sesuai KTP. Akun baru akan diverifikasi admin sebelum dapat menyewa garasi.</p>
+
+{% if errors and (errors | length) %}
+<div class="error-summary" role="alert">
+  <ul>
+    {% for field, message in errors %}
+    <li>{{ message }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<form class="form" method="post" action="/register" novalidate>
+  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+  <div class="form-field">
+    <label for="nik">NIK</label>
+    <input id="nik" name="nik" type="text" inputmode="numeric" maxlength="16" required
+           value="{{ values.nik }}"
+           aria-describedby="nik-hint nik-error"{% if errors.nik %} aria-invalid="true"{% endif %}>
+    <p class="field-hint" id="nik-hint">16 digit angka sesuai KTP</p>
+    <p class="field-error" id="nik-error">{{ errors.nik }}</p>
+  </div>
+
+  <div class="form-field">
+    <label for="fullName">Nama Lengkap</label>
+    <input id="fullName" name="fullName" type="text" required
+           value="{{ values.fullName }}"
+           aria-describedby="fullName-error"{% if errors.fullName %} aria-invalid="true"{% endif %}>
+    <p class="field-error" id="fullName-error">{{ errors.fullName }}</p>
+  </div>
+
+  <div class="form-field">
+    <label for="phone">Nomor Telepon</label>
+    <input id="phone" name="phone" type="tel" required
+           value="{{ values.phone }}"
+           aria-describedby="phone-hint phone-error"{% if errors.phone %} aria-invalid="true"{% endif %}>
+    <p class="field-hint" id="phone-hint">Contoh: 081234567890</p>
+    <p class="field-error" id="phone-error">{{ errors.phone }}</p>
+  </div>
+
+  <div class="form-field">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required
+           value="{{ values.email }}"
+           aria-describedby="email-hint email-error"{% if errors.email %} aria-invalid="true"{% endif %}>
+    <p class="field-hint" id="email-hint">Email dipakai sebagai username saat masuk</p>
+    <p class="field-error" id="email-error">{{ errors.email }}</p>
+  </div>
+
+  <div class="form-field">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="new-password" required
+           aria-describedby="password-hint password-error"{% if errors.password %} aria-invalid="true"{% endif %}>
+    <p class="field-hint" id="password-hint">8-72 karakter</p>
+    <p class="field-error" id="password-error">{{ errors.password }}</p>
+  </div>
+
+  <button class="btn btn--primary" type="submit">Daftar</button>
+</form>
+{% endblock %}
