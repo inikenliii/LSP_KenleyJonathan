@@ -1,7 +1,7 @@
 import 'server-only';
 import { BcryptPasswordHasher } from '@/lib/password-hasher';
 import { prisma } from '@/lib/db';
-import { UserRepository } from '@/repositories';
+import { SessionRepository, UserRepository, type ISessionRepository } from '@/repositories';
 import { AuthService, type IAuthService } from '@/services';
 
 /**
@@ -19,3 +19,6 @@ export const passwordHasher = new BcryptPasswordHasher();
 
 /** Layanan autentikasi dengan repository dan pengaman password di atas. */
 export const authService: IAuthService = new AuthService(userRepository, passwordHasher);
+
+/** Repository sesi login pada tabel session. */
+export const sessionRepository: ISessionRepository = new SessionRepository(prisma);

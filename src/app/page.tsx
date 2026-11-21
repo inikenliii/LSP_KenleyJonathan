@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { FadeIn } from '@/components/fade-in';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,15 +9,21 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { getCurrentUser, homePathFor } from '@/lib/auth/dal';
 
 /**
  * Halaman Beranda: perkenalan singkat aplikasi dengan dua tombol menuju
- * pendaftaran penyewa dan halaman masuk. Rute /register dan /login dibuat
- * pada plan berikutnya.
+ * pendaftaran penyewa dan halaman masuk. Pengguna yang sudah masuk langsung
+ * dialihkan ke beranda perannya.
  *
  * @returns Kartu di tengah layar berisi judul, penjelasan, dan dua tautan.
  */
-export default function Home() {
+export default async function Home() {
+  const user = await getCurrentUser();
+  if (user !== null) {
+    redirect(homePathFor(user.role));
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
       <FadeIn>
