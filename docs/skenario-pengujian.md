@@ -8,12 +8,12 @@ Cara menjalankan seluruh tes: `npm test` (menjalankan `vitest run`).
 
 - Tanggal dijalankan: 22 November 2026
 - Perintah: `npm test`
-- Berkas tes: 18
-- Jumlah tes: 222
-- Lulus: 222
+- Berkas tes: 22
+- Jumlah tes: 255
+- Lulus: 255
 - Gagal: 0
 
-Dokumen ini memuat 99 skenario terpilih dari 222 tes; daftar lengkap tampil saat menjalankan `npm test`.
+Dokumen ini memuat 99 skenario terpilih dari 255 tes; daftar lengkap tampil saat menjalankan `npm test`.
 
 Kolom Hasil Aktual berisi status tiap tes pada proses tersebut. Kolom Berkas Tes memuat jalur berkas dan judul tes persis seperti yang tampil di Vitest.
 
