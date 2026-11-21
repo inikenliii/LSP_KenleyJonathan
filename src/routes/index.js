@@ -19,5 +19,9 @@ export function createRouter(controllers = {}) {
   router.get('/register', controllers.auth.showRegister);
   router.post('/register', controllers.auth.register);
 
+  router.get('/login', controllers.auth.showLogin);
+  router.post('/login', controllers.auth.login);
+  router.post('/logout', controllers.auth.logout);
+
   return router;
 }

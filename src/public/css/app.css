@@ -19,7 +19,8 @@ a { color: #0b5cad; }
 .site-header { background: #ffffff; border-bottom: 1px solid #d5dae1; }
 .site-header .container { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .site-title { font-weight: 700; font-size: 1.125rem; color: #1f2933; text-decoration: none; padding: 12px 0; }
-.site-nav ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.site-nav ul { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.site-nav form { margin: 0; }
 .site-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; }
 .site-footer { padding-top: 24px; padding-bottom: 24px; color: #52606d; }
 

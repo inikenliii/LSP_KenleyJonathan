@@ -70,4 +70,33 @@ export class UserRepository {
       throw err;
     }
   }
+
+  /**
+   * Mencari pengguna berdasarkan email untuk proses masuk. Ini satu-satunya
+   * method yang mengembalikan hash password.
+   *
+   * @param {string} email Email (sudah huruf kecil).
+   * @returns {Promise<{ user: User, passwordHash: string }|null>} Pengguna beserta hash, atau null.
+   */
+  async findAuthRecordByEmail(email) {
+    const row = await this.prisma.user.findUnique({
+      where: { email },
+      select: { ...PUBLIC_USER_SELECT, passwordHash: true },
+    });
+    if (row === null) {
+      return null;
+    }
+    return { user: User.fromRecord(row), passwordHash: row.passwordHash };
+  }
+
+  /**
+   * Mencari pengguna berdasarkan id (tanpa hash password).
+   *
+   * @param {number} id Id pengguna.
+   * @returns {Promise<User|null>} Pengguna, atau null bila tidak ada.
+   */
+  async findById(id) {
+    const row = await this.prisma.user.findUnique({ where: { id }, select: PUBLIC_USER_SELECT });
+    return row === null ? null : User.fromRecord(row);
+  }
 }

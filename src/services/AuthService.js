@@ -3,11 +3,17 @@
  */
 import bcrypt from 'bcryptjs';
 import { User } from '../domain/User.js';
-import { ValidationError, DuplicateUserError, toAppError } from '../domain/errors.js';
-import { registrationSchema } from '../validation/authSchemas.js';
+import {
+  ValidationError,
+  DuplicateUserError,
+  AuthenticationError,
+  AccountNotVerifiedError,
+  toAppError,
+} from '../domain/errors.js';
+import { registrationSchema, loginSchema } from '../validation/authSchemas.js';
 
 /**
- * Menangani pendaftaran akun. Repository diterima lewat konstruktor.
+ * Menangani pendaftaran dan proses masuk akun. Repository diterima lewat konstruktor.
  */
 export class AuthService {
   /**
@@ -46,6 +52,34 @@ export class AuthService {
         role: User.ROLE.RENTER,
         verificationStatus: User.STATUS.PENDING,
       });
+    } catch (err) {
+      throw toAppError(err);
+    }
+  }
+
+  /**
+   * Memeriksa email dan password lalu aturan verifikasi. Email tidak dikenal
+   * dan password salah memberi error yang sama; status verifikasi baru
+   * diberitahukan setelah password terbukti benar.
+   *
+   * @param {object} input Data formulir masuk (email dan password).
+   * @returns {Promise<User>} Pengguna yang berhak masuk.
+   * @throws {ValidationError} Bila data tidak valid.
+   * @throws {AuthenticationError} Bila email tidak dikenal atau password salah.
+   * @throws {AccountNotVerifiedError} Bila penyewa belum diterima admin.
+   * @throws {import('../domain/errors.js').DatabaseError} Bila terjadi kegagalan tak terduga.
+   */
+  async authenticate(input) {
+    const data = ValidationError.parse(loginSchema, input ?? {});
+    try {
+      const record = await this.userRepository.findAuthRecordByEmail(data.email);
+      if (record === null || !(await bcrypt.compare(data.password, record.passwordHash))) {
+        throw new AuthenticationError();
+      }
+      if (!record.user.canAccessSystem()) {
+        throw new AccountNotVerifiedError(record.user.verificationStatus);
+      }
+      return record.user;
     } catch (err) {
       throw toAppError(err);
     }

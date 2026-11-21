@@ -14,6 +14,7 @@ import { env } from './config/env.js';
 import { UserRepository } from './repositories/UserRepository.js';
 import { AuthService } from './services/AuthService.js';
 import { AuthController } from './controllers/AuthController.js';
+import { createAttachUser } from './middleware/auth.js';
 import { createRouter } from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
@@ -113,10 +114,14 @@ export function createApp({ prisma, pgPool }) {
     next();
   });
 
-  app.use(csrfSynchronisedProtection);
-
   // Repository -> service -> controller disusun di sini (composition root).
   const userRepository = new UserRepository(prisma);
+
+  // Dipasang sebelum proteksi CSRF agar halaman error 403 pun tahu siapa penggunanya.
+  app.use(createAttachUser(userRepository));
+
+  app.use(csrfSynchronisedProtection);
+
   const authService = new AuthService(userRepository);
   const controllers = { auth: new AuthController(authService) };
   app.use(createRouter(controllers));
