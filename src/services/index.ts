@@ -26,6 +26,13 @@ export {
   type RentalView,
 } from './RentalService';
 export {
+  ReportService,
+  type DailyReportView,
+  type IReportService,
+  type MonthlyReportView,
+  type ReportPeriod,
+} from './ReportService';
+export {
   VerificationService,
   type IVerificationService,
   type VerificationResult,

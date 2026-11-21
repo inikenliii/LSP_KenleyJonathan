@@ -6,6 +6,7 @@ import {
   GarageRepository,
   RentalExtensionRepository,
   RentalRepository,
+  ReportRepository,
   SessionRepository,
   UserRepository,
   type ISessionRepository,
@@ -15,11 +16,13 @@ import {
   GarageService,
   RentalExtensionService,
   RentalService,
+  ReportService,
   VerificationService,
   type IAuthService,
   type IGarageService,
   type IRentalExtensionService,
   type IRentalService,
+  type IReportService,
   type IVerificationService,
 } from '@/services';
 
@@ -62,3 +65,6 @@ export const rentalExtensionService: IRentalExtensionService = new RentalExtensi
   new RentalExtensionRepository(prisma),
   new LocalPaymentProofStorage(),
 );
+
+/** Layanan laporan sewa di atas repository laporan (hanya membaca). */
+export const reportService: IReportService = new ReportService(new ReportRepository(prisma));

@@ -9,5 +9,6 @@ export * from './pricing';
 export * from './rentalCost';
 export * from './rentalExtension';
 export * from './rentalPeriod';
+export * from './rentalReport';
 export * from './User';
 export * from './vehicle';
