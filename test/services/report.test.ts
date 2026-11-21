@@ -113,6 +113,8 @@ async function sisipPerpanjangan(rentalId: number, amount: number): Promise<void
       rentalId,
       previousEndDate: parseIsoDate('2026-01-01'),
       newEndDate: parseIsoDate('2026-01-02'),
+      extensionType: 'HARIAN',
+      quantity: 1,
       additionalDays: 1,
       dailyPrice: amount,
       amount,

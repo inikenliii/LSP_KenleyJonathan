@@ -6,6 +6,7 @@
 import {
   ConflictError,
   EXTENSION_TOO_FAR_MESSAGE,
+  ExtensionQuantityError,
   ExtensionTooFarError,
   GarageFactory,
   NotFoundError,
@@ -13,18 +14,18 @@ import {
   RENTAL_TYPE_LABELS,
   ValidationError,
   VehicleFactory,
-  addDays,
   calculateExtensionCost,
-  countAdditionalDays,
   detectProofImageType,
   formatTanggal,
   formatTanggalWaktu,
   isRentalActive,
+  maxExtensionDays,
   toAppError,
   toIsoDate,
   todayInJakarta,
   type ExtensionCostBreakdown,
   type ProofImageType,
+  type RentalTypeCode,
 } from '@/domain';
 import type { IPaymentProofStorage } from '@/lib/payment-proof-storage';
 import type {
@@ -67,8 +68,8 @@ export interface ExtendableRentalView {
   dailyPrice: number;
   /** Apakah sewa masih berlaku hari ini. */
   isActive: boolean;
-  /** Tanggal selesai baru paling awal yang boleh dipilih, `YYYY-MM-DD`. */
-  minNewEndDate: string;
+  /** Jumlah hari terbanyak untuk perpanjangan harian (hari pada bulan tanggal berakhir - 1). */
+  maxExtensionDays: number;
 }
 
 /** Satu perpanjangan yang sudah tersimpan, siap ditampilkan. */
@@ -85,7 +86,15 @@ export interface ExtensionView {
   previousEndDateLabel: string;
   /** Tanggal berakhir baru dalam Bahasa Indonesia. */
   newEndDateLabel: string;
-  /** Jumlah hari tambahan. */
+  /** Jenis perpanjangan: "HARIAN" atau "BULANAN". */
+  extensionType: RentalTypeCode;
+  /** Nama jenis perpanjangan ("Harian" atau "Bulanan"). */
+  extensionTypeLabel: string;
+  /** Jumlah hari (harian) atau jumlah bulan (bulanan). */
+  quantity: number;
+  /** Jumlah dengan satuannya, misalnya "10 hari" atau "2 bulan". */
+  quantityLabel: string;
+  /** Jumlah hari kalender tambahan. */
   additionalDays: number;
   /** Salinan harga harian yang dipakai. */
   dailyPrice: number;
@@ -126,14 +135,15 @@ export interface IRentalExtensionService {
   getRentalExtensions(rentalId: number): Promise<RentalExtensionDetail>;
 
   /**
-   * Memperpanjang sewa yang masih aktif. Tanggal berakhir lama, tambahan hari,
-   * harga harian, dan sisa biaya dihitung server dari sewa tersimpan.
+   * Memperpanjang sewa yang masih aktif secara harian atau bulanan. Tanggal berakhir
+   * lama dan baru, tambahan hari, harga harian, dan sisa biaya dihitung server dari
+   * sewa tersimpan.
    *
    * @param adminId Id Admin dari sesi (bukan dari formulir).
-   * @param input Isian formulir mentah, termasuk byte bukti pembayaran.
+   * @param input Isian formulir mentah (id sewa, jenis, jumlah, dan byte bukti pembayaran).
    * @returns Perpanjangan yang tersimpan.
-   * @throws {ValidationError} Bila isian tidak sah, tanggal baru tidak setelah tanggal berakhir
-   *   saat ini, atau tanggal baru terlalu jauh sehingga tambahan hari atau sisa biaya melewati batas database.
+   * @throws {ValidationError} Bila isian tidak sah, jumlah di luar batas jenisnya, atau hasilnya
+   *   terlalu jauh sehingga tambahan hari atau sisa biaya melewati batas database.
    * @throws {NotFoundError} Bila sewa tidak ada.
    * @throws {ConflictError} Bila sewa sudah berakhir atau berubah saat disimpan.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
@@ -210,14 +220,14 @@ export class RentalExtensionService implements IRentalExtensionService {
   }
 
   /**
-   * Memperpanjang sewa. Berkas bukti disimpan setelah semua pemeriksaan lolos
-   * dan dihapus lagi bila penyimpanan perpanjangan gagal (misalnya kalah balapan).
+   * Memperpanjang sewa secara harian atau bulanan. Berkas bukti disimpan setelah semua
+   * pemeriksaan lolos dan dihapus lagi bila penyimpanan perpanjangan gagal (misalnya kalah balapan).
    *
    * @param adminId Id Admin dari sesi.
    * @param input Isian formulir mentah.
    * @returns Perpanjangan yang tersimpan.
-   * @throws {ValidationError} Bila isian tidak sah, tanggal baru tidak setelah tanggal berakhir
-   *   saat ini, atau tanggal baru terlalu jauh sehingga tambahan hari atau sisa biaya melewati batas database.
+   * @throws {ValidationError} Bila isian tidak sah, jumlah di luar batas jenisnya, atau hasilnya
+   *   terlalu jauh sehingga tambahan hari atau sisa biaya melewati batas database.
    * @throws {NotFoundError} Bila sewa tidak ada.
    * @throws {ConflictError} Bila sewa sudah berakhir atau berubah saat disimpan.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
@@ -236,21 +246,20 @@ export class RentalExtensionService implements IRentalExtensionService {
       if (sewa.startDate.getTime() > today.getTime() || !isRentalActive(sewa.endDate, today)) {
         throw new ConflictError('Sewa sudah berakhir dan tidak bisa diperpanjang');
       }
-      if (countAdditionalDays(sewa.endDate, data.newEndDate) < 1) {
-        throw new ValidationError({
-          newEndDate: ['Tanggal selesai baru harus setelah tanggal selesai saat ini'],
-        });
-      }
       let biaya: ExtensionCostBreakdown;
       try {
         biaya = calculateExtensionCost({
+          extensionType: data.extensionType,
+          quantity: data.quantity,
           currentEndDate: sewa.endDate,
-          newEndDate: data.newEndDate,
           dailyPrice: sewa.dailyPrice,
         });
       } catch (error) {
+        if (error instanceof ExtensionQuantityError) {
+          throw new ValidationError({ quantity: [error.message] });
+        }
         if (error instanceof ExtensionTooFarError) {
-          throw new ValidationError({ newEndDate: [EXTENSION_TOO_FAR_MESSAGE] });
+          throw new ValidationError({ quantity: [EXTENSION_TOO_FAR_MESSAGE] });
         }
         throw error;
       }
@@ -260,7 +269,9 @@ export class RentalExtensionService implements IRentalExtensionService {
         {
           rentalId: sewa.id,
           previousEndDate: sewa.endDate,
-          newEndDate: data.newEndDate,
+          newEndDate: biaya.newEndDate,
+          extensionType: data.extensionType,
+          quantity: data.quantity,
           additionalDays: biaya.additionalDays,
           dailyPrice: sewa.dailyPrice,
           amount: biaya.amount,
@@ -307,7 +318,7 @@ export class RentalExtensionService implements IRentalExtensionService {
   }
 
   /**
-   * Mengubah data sewa menjadi tampilan dengan label dan tanggal selesai baru paling awal.
+   * Mengubah data sewa menjadi tampilan dengan label dan batas hari perpanjangan harian.
    *
    * @param row Sewa dari repository.
    * @param today Tanggal hari ini (tanggal-saja).
@@ -330,7 +341,7 @@ export class RentalExtensionService implements IRentalExtensionService {
       endDateLabel: formatTanggal(row.endDate),
       dailyPrice: row.dailyPrice,
       isActive: row.startDate.getTime() <= today.getTime() && isRentalActive(row.endDate, today),
-      minNewEndDate: toIsoDate(addDays(row.endDate, 1)),
+      maxExtensionDays: maxExtensionDays(row.endDate),
     };
   }
 
@@ -348,6 +359,10 @@ export class RentalExtensionService implements IRentalExtensionService {
       newEndDate: toIsoDate(row.newEndDate),
       previousEndDateLabel: formatTanggal(row.previousEndDate),
       newEndDateLabel: formatTanggal(row.newEndDate),
+      extensionType: row.extensionType,
+      extensionTypeLabel: RENTAL_TYPE_LABELS[row.extensionType],
+      quantity: row.quantity,
+      quantityLabel: `${row.quantity} ${row.extensionType === 'BULANAN' ? 'bulan' : 'hari'}`,
       additionalDays: row.additionalDays,
       dailyPrice: row.dailyPrice,
       amount: row.amount,

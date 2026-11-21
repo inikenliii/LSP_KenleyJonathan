@@ -151,21 +151,24 @@ model Rental {
   @@map("rentals")
 }
 
-// Satu perpanjangan sewa aktif oleh Admin. Sisa biaya = tambahan hari x salinan harga
-// harian sewa tersebut; tanggal berakhir sewa dipindah ke tanggal berakhir baru.
+// Satu perpanjangan sewa aktif oleh Admin, harian atau bulanan seperti sewa baru. Sisa biaya =
+// jumlah hari x salinan harga harian sewa (harian) atau jumlah bulan x 25 x harga harian
+// (bulanan); tanggal berakhir sewa dipindah ke tanggal berakhir baru.
 model RentalExtension {
-  id               Int      @id @default(autoincrement())
-  rentalId         Int      @map("rental_id")
-  rental           Rental   @relation(fields: [rentalId], references: [id])
-  previousEndDate  DateTime @map("previous_end_date") @db.Date
-  newEndDate       DateTime @map("new_end_date") @db.Date
-  additionalDays   Int      @map("additional_days")
-  dailyPrice       Int      @map("daily_price") // salinan harga harian dari sewa
+  id               Int        @id @default(autoincrement())
+  rentalId         Int        @map("rental_id")
+  rental           Rental     @relation(fields: [rentalId], references: [id])
+  previousEndDate  DateTime   @map("previous_end_date") @db.Date
+  newEndDate       DateTime   @map("new_end_date") @db.Date
+  extensionType    RentalType @map("extension_type") // jenis perpanjangan: harian atau bulanan
+  quantity         Int // jumlah hari (harian) atau jumlah bulan (bulanan)
+  additionalDays   Int        @map("additional_days")
+  dailyPrice       Int        @map("daily_price") // salinan harga harian dari sewa
   amount           Int // rupiah utuh
-  paymentProofFile String   @map("payment_proof_file") @db.VarChar(64) // nama file hasil buatan server
-  adminId          Int      @map("admin_id")
-  admin            User     @relation(fields: [adminId], references: [id])
-  createdAt        DateTime @default(now()) @map("created_at")
+  paymentProofFile String     @map("payment_proof_file") @db.VarChar(64) // nama file hasil buatan server
+  adminId          Int        @map("admin_id")
+  admin            User       @relation(fields: [adminId], references: [id])
+  createdAt        DateTime   @default(now()) @map("created_at")
 
   // Riwayat perpanjangan dan jumlah laporan selalu dicari per sewa.
   @@index([rentalId])

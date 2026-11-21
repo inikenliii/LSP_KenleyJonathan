@@ -1,7 +1,7 @@
 /**
  * @file Tes layanan perpanjangan sewa (PER-01 sampai PER-04) pada database uji:
- * daftar sewa aktif, perpanjangan dengan sisa biaya dari server, riwayat,
- * penolakan tanggal dan bukti tidak sah, balapan dua Admin, dan akses bukti bayar.
+ * daftar sewa aktif, perpanjangan harian dan bulanan dengan sisa biaya dari server,
+ * riwayat, penolakan jumlah dan bukti tidak sah, balapan dua Admin, dan akses bukti bayar.
  */
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -12,7 +12,11 @@ import {
   NotFoundError,
   ValidationError,
   addDays,
+  computeEndDate,
+  countAdditionalDays,
   daysInMonth,
+  maxExtensionDays,
+  parseIsoDate,
   toIsoDate,
   todayInJakarta,
 } from '@/domain';
@@ -117,15 +121,38 @@ function isianSepeda(): Record<string, unknown> {
 /**
  * Membuat isian perpanjangan yang sah untuk sewa uji.
  *
- * @param newEndDate Tanggal selesai baru, `YYYY-MM-DD`.
+ * @param extensionType Jenis perpanjangan (HARIAN atau BULANAN).
+ * @param quantity Jumlah hari atau bulan.
  * @param override Isian yang menggantikan atau menambah isian dasar.
  * @returns Isian formulir mentah untuk `extendRental`.
  */
 function isianPerpanjangan(
-  newEndDate: string,
+  extensionType: string | undefined,
+  quantity: number | string | undefined,
   override: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  return { rentalId: String(rentalId), newEndDate, paymentProof: PNG, ...override };
+  return { rentalId: String(rentalId), extensionType, quantity, paymentProof: PNG, ...override };
+}
+
+/**
+ * Membuat sewa bulanan mobil listrik E001 (harga harian 80000) milik penyewa A.
+ *
+ * @returns Id sewa.
+ */
+async function buatSewaListrik(): Promise<number> {
+  const sewa = await rentalService.createRental(renterA, {
+    vehicleType: 'MOBIL_LISTRIK',
+    vehicleBrand: 'Hyundai',
+    vehicleModel: 'Ioniq 5',
+    plateNumber: 'B 9 XYZ',
+    batteryKwh: '60',
+    remainingKwh: '20',
+    rentalType: 'BULANAN',
+    garageType: 'ELECTRIC_CAR',
+    garageId: 'E001',
+    paymentProof: PNG,
+  });
+  return sewa.id;
 }
 
 /**
@@ -199,7 +226,7 @@ describe('RentalExtensionService.listActiveRentals', () => {
       endDate: toIsoDate(addDays(today, 3)),
       dailyPrice: 10000,
       isActive: true,
-      minNewEndDate: toIsoDate(addDays(today, 4)),
+      maxExtensionDays: maxExtensionDays(addDays(today, 3)),
     });
   });
 
@@ -236,21 +263,27 @@ describe('RentalExtensionService.listActiveRentals', () => {
 });
 
 describe('RentalExtensionService.extendRental', () => {
-  it('memperpanjang sewa: tanggal berakhir pindah, riwayat tersimpan, garasi tetap used', async () => {
+  it('perpanjangan harian: tanggal berakhir pindah, jenis, jumlah, dan biaya tersimpan, garasi tetap used', async () => {
     const today = todayInJakarta();
-    const hasil = await service.extendRental(
-      admin1,
-      isianPerpanjangan(toIsoDate(addDays(today, 10))),
-    );
+    const hasil = await service.extendRental(admin1, isianPerpanjangan('HARIAN', 7));
+    expect(hasil.extensionType).toBe('HARIAN');
+    expect(hasil.extensionTypeLabel).toBe('Harian');
+    expect(hasil.quantity).toBe(7);
+    expect(hasil.quantityLabel).toBe('7 hari');
     expect(hasil.additionalDays).toBe(7);
     expect(hasil.dailyPrice).toBe(10000);
     expect(hasil.amount).toBe(70000);
     expect(hasil.adminName).toBe('Admin Uji');
+    expect(hasil.newEndDate).toBe(toIsoDate(addDays(today, 10)));
 
     const sewa = await prisma.rental.findUniqueOrThrow({ where: { id: rentalId } });
     expect(toIsoDate(sewa.endDate)).toBe(toIsoDate(addDays(today, 10)));
     const baris = await prisma.rentalExtension.findMany();
     expect(baris).toHaveLength(1);
+    expect(baris[0].extensionType).toBe('HARIAN');
+    expect(baris[0].quantity).toBe(7);
+    expect(baris[0].additionalDays).toBe(7);
+    expect(baris[0].amount).toBe(70000);
     expect(toIsoDate(baris[0].previousEndDate)).toBe(toIsoDate(addDays(today, 3)));
     expect(toIsoDate(baris[0].newEndDate)).toBe(toIsoDate(addDays(today, 10)));
     expect(baris[0].adminId).toBe(admin1);
@@ -261,59 +294,68 @@ describe('RentalExtensionService.extendRental', () => {
     expect(await berkasBukti()).toHaveLength(2);
   });
 
+  it('perpanjangan bulanan: tiap bulan memakai hari bulan tempat langkahnya dimulai, biaya 25 x harga harian per bulan', async () => {
+    const today = todayInJakarta();
+    const akhirLama = addDays(today, 3);
+    const bulanPertama = computeEndDate(akhirLama, 'BULANAN');
+    const akhirBaru = computeEndDate(bulanPertama, 'BULANAN');
+
+    const hasil = await service.extendRental(admin1, isianPerpanjangan('BULANAN', 2));
+    expect(hasil.extensionType).toBe('BULANAN');
+    expect(hasil.quantity).toBe(2);
+    expect(hasil.quantityLabel).toBe('2 bulan');
+    expect(hasil.newEndDate).toBe(toIsoDate(akhirBaru));
+    expect(hasil.additionalDays).toBe(countAdditionalDays(akhirLama, akhirBaru));
+    expect(hasil.amount).toBe(2 * 25 * 10000);
+
+    const baris = await prisma.rentalExtension.findFirstOrThrow();
+    expect(baris.extensionType).toBe('BULANAN');
+    expect(baris.quantity).toBe(2);
+    expect(baris.amount).toBe(500000);
+    const sewa = await prisma.rental.findUniqueOrThrow({ where: { id: rentalId } });
+    expect(toIsoDate(sewa.endDate)).toBe(toIsoDate(akhirBaru));
+    expect((await prisma.garage.findUniqueOrThrow({ where: { id: 'S001' } })).status).toBe('USED');
+  });
+
   it('perpanjangan kedua memakai tanggal berakhir terbaru dan riwayat berurut dari yang lama', async () => {
     const today = todayInJakarta();
-    await service.extendRental(admin1, isianPerpanjangan(toIsoDate(addDays(today, 10))));
-    const kedua = await service.extendRental(
-      admin2,
-      isianPerpanjangan(toIsoDate(addDays(today, 12))),
-    );
-    expect(kedua.previousEndDate).toBe(toIsoDate(addDays(today, 10)));
-    expect(kedua.additionalDays).toBe(2);
+    await service.extendRental(admin1, isianPerpanjangan('HARIAN', 5));
+    const kedua = await service.extendRental(admin2, isianPerpanjangan('BULANAN', 1));
+    const akhirKedua = computeEndDate(addDays(today, 8), 'BULANAN');
+    expect(kedua.previousEndDate).toBe(toIsoDate(addDays(today, 8)));
+    expect(kedua.newEndDate).toBe(toIsoDate(akhirKedua));
+    expect(kedua.amount).toBe(250000);
 
     const detail = await service.getRentalExtensions(rentalId);
-    expect(detail.rental.endDate).toBe(toIsoDate(addDays(today, 12)));
-    expect(detail.extensions.map((e) => e.newEndDate)).toEqual([
-      toIsoDate(addDays(today, 10)),
-      toIsoDate(addDays(today, 12)),
-    ]);
+    expect(detail.rental.endDate).toBe(toIsoDate(akhirKedua));
+    expect(detail.extensions.map((e) => e.quantityLabel)).toEqual(['5 hari', '1 bulan']);
+    expect(detail.extensions.map((e) => e.extensionTypeLabel)).toEqual(['Harian', 'Bulanan']);
     expect(detail.extensions.map((e) => e.adminName)).toEqual(['Admin Uji', 'Admin Dua']);
     expect(detail.extensions.every((e) => e.createdAtLabel.length > 0)).toBe(true);
   });
 
-  it('sewa bulanan: sisa biaya = hari x harga harian, tanpa biaya pengisian dan bukan 25 x harga', async () => {
-    const today = todayInJakarta();
-    const bulanan = await rentalService.createRental(renterA, {
-      vehicleType: 'MOBIL_LISTRIK',
-      vehicleBrand: 'Hyundai',
-      vehicleModel: 'Ioniq 5',
-      plateNumber: 'B 9 XYZ',
-      batteryKwh: '60',
-      remainingKwh: '20',
-      rentalType: 'BULANAN',
-      garageType: 'ELECTRIC_CAR',
-      garageId: 'E001',
-      paymentProof: PNG,
-    });
-    const akhir = addDays(today, daysInMonth(today));
+  it('sewa mobil listrik: perpanjangan bulanan tanpa biaya pengisian, memakai harga harian milik sewa', async () => {
+    const bulanan = await buatSewaListrik();
     const hasil = await service.extendRental(admin1, {
-      rentalId: String(bulanan.id),
-      newEndDate: toIsoDate(addDays(akhir, 31)),
+      rentalId: String(bulanan),
+      extensionType: 'BULANAN',
+      quantity: '1',
       paymentProof: PNG,
     });
-    expect(hasil.additionalDays).toBe(31);
     expect(hasil.dailyPrice).toBe(80000);
-    expect(hasil.amount).toBe(2480000);
+    expect(hasil.amount).toBe(2000000);
+    expect(hasil.additionalDays).toBe(daysInMonth(parseIsoDate(hasil.previousEndDate)));
   });
 
   it('mengabaikan isian yang dikirim klien untuk nilai yang dihitung server', async () => {
     const today = todayInJakarta();
     const hasil = await service.extendRental(
       admin1,
-      isianPerpanjangan(toIsoDate(addDays(today, 10)), {
+      isianPerpanjangan('HARIAN', 7, {
         amount: '1',
         additionalDays: '99',
         previousEndDate: '2000-01-01',
+        newEndDate: '2099-01-01',
         dailyPrice: '1',
         adminId: String(renterB),
       }),
@@ -324,6 +366,7 @@ describe('RentalExtensionService.extendRental', () => {
     expect(baris.amount).toBe(70000);
     expect(baris.adminId).toBe(admin1);
     expect(toIsoDate(baris.previousEndDate)).toBe(toIsoDate(addDays(today, 3)));
+    expect(toIsoDate(baris.newEndDate)).toBe(toIsoDate(addDays(today, 10)));
   });
 
   /**
@@ -337,36 +380,60 @@ describe('RentalExtensionService.extendRental', () => {
     expect(await berkasBukti()).toHaveLength(1);
   }
 
-  it('menolak tanggal baru yang sama atau lebih awal dari tanggal berakhir saat ini', async () => {
-    const today = todayInJakarta();
-    for (const tanggal of [addDays(today, 3), addDays(today, 2)]) {
-      const galat = await galatValidasi(isianPerpanjangan(toIsoDate(tanggal)));
-      expect(galat.fieldErrors.newEndDate).toEqual([
-        'Tanggal selesai baru harus setelah tanggal selesai saat ini',
+  it('menolak jumlah hari harian 0 dan lebih dari batas bulan tanggal berakhir', async () => {
+    const batas = maxExtensionDays(addDays(todayInJakarta(), 3));
+    for (const jumlah of [0, batas + 1]) {
+      const galat = await galatValidasi(isianPerpanjangan('HARIAN', jumlah));
+      expect(galat.fieldErrors.quantity).toEqual([
+        `Jumlah hari perpanjangan harus bilangan bulat 1 sampai ${batas}.`,
       ]);
     }
     await pastikanTidakBerubah();
   });
 
-  it('menolak tanggal yang terlalu jauh dengan pesan di kolom tanggal, tanpa menyimpan apa pun', async () => {
-    const galat = await galatValidasi(isianPerpanjangan('9999-12-31'));
-    expect(galat.fieldErrors.newEndDate).toEqual(['Tanggal selesai baru terlalu jauh']);
+  it('menolak jumlah bulan 0 dan 1201, serta jumlah negatif, desimal, kosong, dan bukan angka', async () => {
+    for (const jumlah of [0, 1201]) {
+      const galat = await galatValidasi(isianPerpanjangan('BULANAN', jumlah));
+      expect(galat.fieldErrors.quantity).toEqual([
+        'Jumlah bulan perpanjangan harus bilangan bulat 1 sampai 1200.',
+      ]);
+    }
+    for (const jumlah of ['-1', '1.5', 'abc']) {
+      const galat = await galatValidasi(isianPerpanjangan('BULANAN', jumlah));
+      expect(galat.fieldErrors.quantity).toEqual(['Jumlah harus bilangan bulat positif']);
+    }
+    const kosong = await galatValidasi(isianPerpanjangan('BULANAN', undefined));
+    expect(kosong.fieldErrors.quantity).toEqual(['Jumlah wajib diisi']);
     await pastikanTidakBerubah();
   });
 
-  it('menolak tanggal yang tidak ada di kalender atau salah format', async () => {
-    for (const tanggal of ['2026-02-30', '30-11-2026']) {
-      const galat = await galatValidasi(isianPerpanjangan(tanggal));
-      expect(galat.fieldErrors.newEndDate).toEqual(['Tanggal selesai baru tidak valid']);
+  it('menolak jenis perpanjangan yang tidak dikenal atau kosong', async () => {
+    for (const jenis of ['MINGGUAN', undefined]) {
+      const galat = await galatValidasi(isianPerpanjangan(jenis, 2));
+      expect(galat.fieldErrors.extensionType).toEqual(['Pilih jenis perpanjangan']);
     }
     await pastikanTidakBerubah();
   });
 
-  it('menolak isian tanpa id sewa', async () => {
-    const today = todayInJakarta();
-    const galat = await galatValidasi(
-      isianPerpanjangan(toIsoDate(addDays(today, 10)), { rentalId: undefined }),
+  it('menolak hasil yang terlalu jauh dengan pesan di kolom jumlah, tanpa menyimpan apa pun', async () => {
+    const listrik = await buatSewaListrik();
+    const galat = await galatValidasi({
+      rentalId: String(listrik),
+      extensionType: 'BULANAN',
+      quantity: '1200',
+      paymentProof: PNG,
+    });
+    expect(galat.fieldErrors.quantity).toEqual(['Tanggal selesai baru terlalu jauh']);
+    const sewa = await prisma.rental.findUniqueOrThrow({ where: { id: listrik } });
+    expect(sewa.endDate.getTime()).toBe(
+      computeEndDate(todayInJakarta(), 'BULANAN').getTime(),
     );
+    expect(await prisma.rentalExtension.count()).toBe(0);
+    expect(await berkasBukti()).toHaveLength(2);
+  });
+
+  it('menolak isian tanpa id sewa', async () => {
+    const galat = await galatValidasi(isianPerpanjangan('HARIAN', 5, { rentalId: undefined }));
     expect(galat.fieldErrors.rentalId).toBeDefined();
     await pastikanTidakBerubah();
   });
@@ -375,10 +442,7 @@ describe('RentalExtensionService.extendRental', () => {
     const today = todayInJakarta();
     const berakhir = await sisipSewa('S002', addDays(today, -3), addDays(today, -1));
     const galatBerakhir = await service
-      .extendRental(
-        admin1,
-        isianPerpanjangan(toIsoDate(addDays(today, 5)), { rentalId: String(berakhir) }),
-      )
+      .extendRental(admin1, isianPerpanjangan('HARIAN', 5, { rentalId: String(berakhir) }))
       .catch((error: unknown) => error);
     expect(galatBerakhir).toBeInstanceOf(ConflictError);
     expect((galatBerakhir as ConflictError).message).toBe(
@@ -386,10 +450,7 @@ describe('RentalExtensionService.extendRental', () => {
     );
 
     const galatTidakAda = await service
-      .extendRental(
-        admin1,
-        isianPerpanjangan(toIsoDate(addDays(today, 5)), { rentalId: '999999' }),
-      )
+      .extendRental(admin1, isianPerpanjangan('HARIAN', 5, { rentalId: '999999' }))
       .catch((error: unknown) => error);
     expect(galatTidakAda).toBeInstanceOf(NotFoundError);
     expect((galatTidakAda as NotFoundError).message).toBe('Sewa tidak ditemukan.');
@@ -399,8 +460,7 @@ describe('RentalExtensionService.extendRental', () => {
   });
 
   it('dua Admin memperpanjang sewa yang sama bersamaan: tepat satu berhasil', async () => {
-    const today = todayInJakarta();
-    const input = isianPerpanjangan(toIsoDate(addDays(today, 5)));
+    const input = isianPerpanjangan('HARIAN', 5);
     const hasil = await Promise.allSettled([
       service.extendRental(admin1, input),
       service.extendRental(admin2, input),
@@ -419,20 +479,21 @@ describe('RentalExtensionService.extendRental', () => {
   });
 
   it('menolak bukti pembayaran yang tidak sah tanpa mengubah apa pun', async () => {
-    const today = todayInJakarta();
-    const tanggal = toIsoDate(addDays(today, 10));
-
-    const kosong = await galatValidasi(isianPerpanjangan(tanggal, { paymentProof: undefined }));
+    const kosong = await galatValidasi(isianPerpanjangan('HARIAN', 10, { paymentProof: undefined }));
     expect(kosong.fieldErrors.paymentProof[0]).toBe('Bukti pembayaran wajib diunggah');
 
     const teks = await galatValidasi(
-      isianPerpanjangan(tanggal, { paymentProof: new TextEncoder().encode('ini hanya teks biasa') }),
+      isianPerpanjangan('HARIAN', 10, {
+        paymentProof: new TextEncoder().encode('ini hanya teks biasa'),
+      }),
     );
     expect(teks.fieldErrors.paymentProof[0]).toBe('Bukti pembayaran harus gambar JPEG, PNG, atau WebP');
 
     const besar = new Uint8Array(2 * 1024 * 1024 + 1);
     besar.set(PNG);
-    const terlaluBesar = await galatValidasi(isianPerpanjangan(tanggal, { paymentProof: besar }));
+    const terlaluBesar = await galatValidasi(
+      isianPerpanjangan('HARIAN', 10, { paymentProof: besar }),
+    );
     expect(terlaluBesar.fieldErrors.paymentProof[0]).toBe('Ukuran bukti pembayaran paling besar 2 MB');
 
     await pastikanTidakBerubah();
@@ -441,11 +502,7 @@ describe('RentalExtensionService.extendRental', () => {
 
 describe('RentalExtensionService.getExtensionProof', () => {
   it('bukti perpanjangan terbuka bagi pemilik sewa dan Admin, tertutup bagi penyewa lain', async () => {
-    const today = todayInJakarta();
-    const perpanjangan = await service.extendRental(
-      admin1,
-      isianPerpanjangan(toIsoDate(addDays(today, 10))),
-    );
+    const perpanjangan = await service.extendRental(admin1, isianPerpanjangan('HARIAN', 7));
 
     const milikSendiri = await service.getExtensionProof(
       { id: renterA, role: 'RENTER' },

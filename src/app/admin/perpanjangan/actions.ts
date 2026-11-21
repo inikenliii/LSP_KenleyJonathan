@@ -13,11 +13,12 @@ import type { ExtensionView } from '@/services';
 /**
  * Memperpanjang satu sewa yang masih aktif. Server Action adalah endpoint POST
  * yang bisa dipanggil langsung, jadi peran Admin diperiksa lebih dulu. Id Admin
- * diambil dari sesi; tanggal selesai lama, tambahan hari, harga harian, dan sisa
- * biaya dihitung layanan dari sewa tersimpan, tidak pernah dari formulir.
+ * diambil dari sesi; tanggal selesai lama dan baru, tambahan hari, harga harian,
+ * dan sisa biaya dihitung layanan dari sewa tersimpan, tidak pernah dari formulir.
  *
  * @param _previous Hasil sebelumnya (tidak dipakai).
- * @param formData Data formulir: `rentalId`, `newEndDate`, dan berkas `paymentProof`.
+ * @param formData Data formulir: `rentalId`, `extensionType` (HARIAN atau BULANAN),
+ *   `quantity` (hari atau bulan), dan berkas `paymentProof`.
  * @returns Pesan error per field bila gagal; bila berhasil Admin dialihkan ke
  *   halaman perpanjangan sewa yang sama dengan pemberitahuan.
  */
@@ -26,7 +27,7 @@ export async function extendRentalAction(
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireRole('ADMIN');
-  const values = readFormFields(formData, ['rentalId', 'newEndDate']);
+  const values = readFormFields(formData, ['rentalId', 'extensionType', 'quantity']);
 
   // Berkas dibaca menjadi byte; berkas kosong dianggap tidak diunggah.
   const berkas = formData.get('paymentProof');

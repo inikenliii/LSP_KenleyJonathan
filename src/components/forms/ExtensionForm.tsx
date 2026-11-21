@@ -13,61 +13,72 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
+  ExtensionQuantityError,
   ExtensionTooFarError,
   PAYMENT_PROOF_MAX_BYTES,
+  RENTAL_TYPE_CODES,
+  RENTAL_TYPE_LABELS,
   calculateExtensionCost,
   formatRupiah,
+  formatTanggal,
   parseIsoDate,
   type ExtensionCostBreakdown,
+  type RentalTypeCode,
 } from '@/domain';
 import { INITIAL_ACTION_STATE } from '@/lib/action-state';
+
+/** Kelas tampilan pilihan jenis agar serupa dengan kotak isian. */
+const KELAS_PILIHAN =
+  'h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive md:text-sm dark:bg-input/30';
 
 /** Pesan bila berkas bukti melebihi batas ukuran. */
 const PESAN_UKURAN = 'Ukuran bukti pembayaran paling besar 2 MB';
 
 /**
- * Menghitung pratinjau tambahan hari dan sisa biaya dengan fungsi domain yang
- * sama dengan server. Nilai ini hanya tampilan; server menghitung ulang dari
- * sewa yang tersimpan.
+ * Menghitung pratinjau tanggal selesai baru, tambahan hari, dan sisa biaya dengan
+ * fungsi domain yang sama dengan server. Nilai ini hanya tampilan; server menghitung
+ * ulang dari sewa yang tersimpan.
  *
+ * @param extensionType Jenis perpanjangan yang dipilih.
+ * @param quantity Isian jumlah hari atau bulan, atau kosong.
  * @param currentEndDate Tanggal selesai saat ini, `YYYY-MM-DD`.
- * @param newEndDate Isian tanggal selesai baru, `YYYY-MM-DD` atau kosong.
  * @param dailyPrice Salinan harga harian sewa.
- * @returns Rincian perpanjangan; `{ error }` berisi pesan bila tanggal terlalu jauh sehingga
- *   melewati batas database; atau `null` bila tanggal kosong, tidak sah, atau tidak setelah tanggal saat ini.
+ * @returns Rincian perpanjangan; `{ error }` berisi pesan bila jumlah di luar batas atau hasilnya
+ *   terlalu jauh; atau `null` bila jumlah masih kosong atau bukan bilangan bulat.
  */
 function previewExtension(
+  extensionType: RentalTypeCode,
+  quantity: string,
   currentEndDate: string,
-  newEndDate: string,
   dailyPrice: number,
 ): ExtensionCostBreakdown | { error: string } | null {
-  if (newEndDate === '') {
+  if (!/^\d{1,7}$/.test(quantity.trim())) {
     return null;
   }
   try {
     return calculateExtensionCost({
+      extensionType,
+      quantity: Number(quantity),
       currentEndDate: parseIsoDate(currentEndDate),
-      newEndDate: parseIsoDate(newEndDate),
       dailyPrice,
     });
   } catch (error) {
-    if (error instanceof ExtensionTooFarError) {
+    if (error instanceof ExtensionQuantityError || error instanceof ExtensionTooFarError) {
       return { error: error.message };
     }
-    // Tanggal belum sah atau tidak setelah tanggal saat ini: jumlah tidak ditampilkan.
-    return null;
+    throw error;
   }
 }
 
 /**
- * Formulir perpanjangan satu sewa: tanggal selesai baru dengan pratinjau
- * tambahan hari dan sisa biaya, serta unggahan bukti pembayaran perpanjangan.
- * Pesan error server tampil di bawah field masing-masing.
+ * Formulir perpanjangan satu sewa: jenis (harian atau bulanan) dan jumlah hari atau
+ * bulan dengan pratinjau tanggal selesai baru, tambahan hari, dan sisa biaya, serta
+ * unggahan bukti pembayaran perpanjangan. Pesan error server tampil di bawah field masing-masing.
  *
  * @param props.rentalId Id sewa yang diperpanjang (dikirim sebagai field tersembunyi).
  * @param props.currentEndDate Tanggal selesai saat ini, `YYYY-MM-DD`.
  * @param props.currentEndDateLabel Tanggal selesai saat ini dalam Bahasa Indonesia.
- * @param props.minNewEndDate Tanggal selesai baru paling awal, `YYYY-MM-DD`.
+ * @param props.maxExtensionDays Jumlah hari terbanyak untuk perpanjangan harian.
  * @param props.dailyPrice Salinan harga harian sewa, dasar sisa biaya.
  * @returns Formulir dengan tombol "Simpan Perpanjangan" dan kotak pesan hasil.
  */
@@ -75,22 +86,26 @@ export function ExtensionForm({
   rentalId,
   currentEndDate,
   currentEndDateLabel,
-  minNewEndDate,
+  maxExtensionDays,
   dailyPrice,
 }: {
   rentalId: number;
   currentEndDate: string;
   currentEndDateLabel: string;
-  minNewEndDate: string;
+  maxExtensionDays: number;
   dailyPrice: number;
 }) {
   const [state, formAction, pending] = useActionState(extendRentalAction, INITIAL_ACTION_STATE);
   const galat = state.fieldErrors ?? {};
 
-  const [newEndDate, setNewEndDate] = useState(state.values?.newEndDate ?? '');
+  const [extensionType, setExtensionType] = useState<RentalTypeCode>(
+    RENTAL_TYPE_CODES.find((kode) => kode === state.values?.extensionType) ?? 'HARIAN',
+  );
+  const [quantity, setQuantity] = useState(state.values?.quantity ?? '');
   const [fileError, setFileError] = useState<string | null>(null);
 
-  const preview = previewExtension(currentEndDate, newEndDate, dailyPrice);
+  const preview = previewExtension(extensionType, quantity, currentEndDate, dailyPrice);
+  const satuan = extensionType === 'BULANAN' ? 'bulan' : 'hari';
 
   /**
    * Menolak berkas bukti yang lebih besar dari batas sebelum dikirim.
@@ -121,22 +136,47 @@ export function ExtensionForm({
           {galat.rentalId?.[0] && <FieldError>{galat.rentalId[0]}</FieldError>}
         </Field>
 
-        <Field data-invalid={galat.newEndDate?.[0] ? true : undefined}>
-          <FieldLabel htmlFor="newEndDate">Tanggal Selesai Baru</FieldLabel>
+        <Field data-invalid={galat.extensionType?.[0] ? true : undefined}>
+          <FieldLabel htmlFor="extensionType">Jenis Perpanjangan</FieldLabel>
+          <select
+            id="extensionType"
+            name="extensionType"
+            className={KELAS_PILIHAN}
+            value={extensionType}
+            onChange={(event) => setExtensionType(event.target.value as RentalTypeCode)}
+            aria-invalid={galat.extensionType?.[0] ? true : undefined}
+          >
+            {RENTAL_TYPE_CODES.map((kode) => (
+              <option key={kode} value={kode}>
+                {RENTAL_TYPE_LABELS[kode]}
+              </option>
+            ))}
+          </select>
+          {galat.extensionType?.[0] && <FieldError>{galat.extensionType[0]}</FieldError>}
+        </Field>
+
+        <Field data-invalid={galat.quantity?.[0] ? true : undefined}>
+          <FieldLabel htmlFor="quantity">
+            {extensionType === 'BULANAN' ? 'Jumlah Bulan' : 'Jumlah Hari'}
+          </FieldLabel>
           <Input
-            id="newEndDate"
-            name="newEndDate"
-            type="date"
-            min={minNewEndDate}
-            value={newEndDate}
-            onChange={(event) => setNewEndDate(event.target.value)}
-            aria-invalid={galat.newEndDate?.[0] ? true : undefined}
+            id="quantity"
+            name="quantity"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            aria-invalid={galat.quantity?.[0] ? true : undefined}
           />
-          {galat.newEndDate?.[0] ? (
-            <FieldError>{galat.newEndDate[0]}</FieldError>
+          {galat.quantity?.[0] ? (
+            <FieldError>{galat.quantity[0]}</FieldError>
           ) : (
             <FieldDescription>
-              Harus setelah {currentEndDateLabel}; tidak ada batas maksimal.
+              {extensionType === 'BULANAN'
+                ? 'Bilangan bulat 1 sampai 1200 bulan; tiap bulan menambah jumlah hari pada bulan tempat langkahnya dimulai.'
+                : `Maksimal ${maxExtensionDays} hari (jumlah hari pada bulan tanggal selesai saat ini dikurangi satu).`}
             </FieldDescription>
           )}
         </Field>
@@ -148,12 +188,16 @@ export function ExtensionForm({
           <p className="font-medium">Ringkasan Perpanjangan</p>
           {preview === null ? (
             <p className="text-muted-foreground">
-              Pilih tanggal selesai baru setelah {currentEndDateLabel} untuk melihat sisa biaya.
+              Isi jumlah {satuan} untuk melihat tanggal selesai baru dan sisa biaya.
             </p>
           ) : 'error' in preview ? (
             <p className="text-destructive">{preview.error}</p>
           ) : (
             <dl className="flex flex-col gap-1">
+              <div className="flex justify-between gap-4">
+                <dt>Tanggal selesai baru</dt>
+                <dd>{formatTanggal(preview.newEndDate)}</dd>
+              </div>
               <div className="flex justify-between gap-4">
                 <dt>Tambahan hari</dt>
                 <dd>{preview.additionalDays} hari</dd>
@@ -163,7 +207,7 @@ export function ExtensionForm({
                 <dd>{formatRupiah(dailyPrice)}</dd>
               </div>
               <div className="flex justify-between gap-4 font-semibold">
-                <dt>Sisa biaya yang harus dibayar</dt>
+                <dt>Sisa biaya</dt>
                 <dd>{formatRupiah(preview.amount)}</dd>
               </div>
             </dl>

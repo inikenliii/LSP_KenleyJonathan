@@ -25,7 +25,7 @@ export const metadata: Metadata = { title: 'Perpanjangan Sewa' };
  * Halaman Perpanjangan: daftar garasi yang disewa hari ini (urut menurut ID
  * garasi, tanpa halaman), pilihan satu sewa lewat tautan "Pilih", formulir
  * perpanjangan untuk sewa yang dipilih, dan riwayat perpanjangannya (tanggal
- * lama dan baru, tambahan hari, sisa biaya, bukti, Admin, dan waktu). Peran
+ * lama dan baru, jenis dan jumlah, tambahan hari, sisa biaya, bukti, Admin, dan waktu). Peran
  * Admin diperiksa di halaman ini sendiri.
  *
  * @param props.searchParams Parameter alamat; `sewa` adalah Id sewa terpilih (1 sampai 9 angka)
@@ -177,7 +177,7 @@ export default async function ExtensionsPage({
                   rentalId={terpilih.id}
                   currentEndDate={terpilih.endDate}
                   currentEndDateLabel={terpilih.endDateLabel}
-                  minNewEndDate={terpilih.minNewEndDate}
+                  maxExtensionDays={terpilih.maxExtensionDays}
                   dailyPrice={terpilih.dailyPrice}
                 />
               ) : (
@@ -203,6 +203,8 @@ export default async function ExtensionsPage({
                     <TableRow>
                       <TableHead>Tanggal Selesai Lama</TableHead>
                       <TableHead>Tanggal Selesai Baru</TableHead>
+                      <TableHead>Jenis</TableHead>
+                      <TableHead>Jumlah</TableHead>
                       <TableHead>Tambahan Hari</TableHead>
                       <TableHead>Sisa Biaya Dibayar</TableHead>
                       <TableHead>Bukti</TableHead>
@@ -215,6 +217,8 @@ export default async function ExtensionsPage({
                       <TableRow key={item.id}>
                         <TableCell>{item.previousEndDateLabel}</TableCell>
                         <TableCell>{item.newEndDateLabel}</TableCell>
+                        <TableCell>{item.extensionTypeLabel}</TableCell>
+                        <TableCell>{item.quantityLabel}</TableCell>
                         <TableCell>{item.additionalDays} hari</TableCell>
                         <TableCell>{formatRupiah(item.amount)}</TableCell>
                         <TableCell>

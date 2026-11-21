@@ -41,7 +41,11 @@ export interface NewExtensionData {
   previousEndDate: Date;
   /** Tanggal berakhir baru (tanggal-saja). */
   newEndDate: Date;
-  /** Jumlah hari tambahan. */
+  /** Jenis perpanjangan: harian atau bulanan. */
+  extensionType: RentalTypeCode;
+  /** Jumlah hari (harian) atau jumlah bulan (bulanan). */
+  quantity: number;
+  /** Jumlah hari kalender tambahan. */
   additionalDays: number;
   /** Salinan harga harian yang dipakai. */
   dailyPrice: number;

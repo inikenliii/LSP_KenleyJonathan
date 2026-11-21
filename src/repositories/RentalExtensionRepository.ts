@@ -165,6 +165,8 @@ export class RentalExtensionRepository implements IRentalExtensionRepository {
     rentalId: number;
     previousEndDate: Date;
     newEndDate: Date;
+    extensionType: ExtensionRecord['extensionType'];
+    quantity: number;
     additionalDays: number;
     dailyPrice: number;
     amount: number;
@@ -180,6 +182,8 @@ export class RentalExtensionRepository implements IRentalExtensionRepository {
       renterId: baris.rental.renterId,
       previousEndDate: baris.previousEndDate,
       newEndDate: baris.newEndDate,
+      extensionType: baris.extensionType,
+      quantity: baris.quantity,
       additionalDays: baris.additionalDays,
       dailyPrice: baris.dailyPrice,
       amount: baris.amount,
