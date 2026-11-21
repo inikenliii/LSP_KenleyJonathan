@@ -1,0 +1,17 @@
+# Dependensi dan rahasia
+node_modules/
+.env
+
+# Hasil generate Prisma (dibuat ulang oleh postinstall)
+src/generated/
+
+# Berkas unggahan pengguna (bukti pembayaran)
+uploads/
+
+# Semua varian .env tidak ikut repo, kecuali contohnya
+.env.*
+!.env.example
+
+# Log dan laporan cakupan tes
+*.log
+coverage/
