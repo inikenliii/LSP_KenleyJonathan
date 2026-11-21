@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 import { GARAGE_TYPE_CODES } from '@/domain';
+import { wholeNumber } from './wholeNumber';
 
 /** Pesan untuk harga per kWh di luar batas atau bukan bilangan bulat. */
 const PESAN_HARGA_KWH = 'Harga per kWh harus bilangan bulat antara Rp 1 dan Rp 1.000.000';
@@ -41,21 +42,23 @@ export const garageBatchSchema = z.preprocess(
   z
     .object({
       type: z.enum(GARAGE_TYPE_CODES, { error: 'Tipe garasi tidak valid' }),
-      quantity: z.coerce
-        .number({ error: 'Jumlah garasi wajib diisi angka' })
-        .int({ error: 'Jumlah garasi harus bilangan bulat' })
-        .min(1, { error: 'Jumlah garasi paling sedikit 1' })
-        .max(999, { error: 'Jumlah maksimum 999' }),
-      dailyPrice: z.coerce
-        .number({ error: 'Harga harian wajib diisi angka' })
-        .int({ error: 'Harga harian harus bilangan bulat (rupiah)' })
-        .min(1, { error: 'Harga harian paling sedikit Rp 1' })
-        .max(10000000, { error: 'Harga harian paling banyak Rp 10.000.000' }),
-      pricePerKwh: z.coerce
-        .number({ error: PESAN_HARGA_KWH })
-        .int({ error: PESAN_HARGA_KWH })
-        .min(1, { error: PESAN_HARGA_KWH })
-        .max(1000000, { error: PESAN_HARGA_KWH })
+      quantity: wholeNumber('Jumlah garasi wajib diisi angka', 'Jumlah garasi harus bilangan bulat').pipe(
+        z
+          .number()
+          .min(1, { error: 'Jumlah garasi paling sedikit 1' })
+          .max(999, { error: 'Jumlah maksimum 999' }),
+      ),
+      dailyPrice: wholeNumber(
+        'Harga harian wajib diisi angka',
+        'Harga harian harus bilangan bulat (rupiah)',
+      ).pipe(
+        z
+          .number()
+          .min(1, { error: 'Harga harian paling sedikit Rp 1' })
+          .max(10000000, { error: 'Harga harian paling banyak Rp 10.000.000' }),
+      ),
+      pricePerKwh: wholeNumber(PESAN_HARGA_KWH, PESAN_HARGA_KWH)
+        .pipe(z.number().min(1, { error: PESAN_HARGA_KWH }).max(1000000, { error: PESAN_HARGA_KWH }))
         .optional(),
     })
     .refine((data) => data.type !== 'ELECTRIC_CAR' || data.pricePerKwh !== undefined, {

@@ -9,3 +9,4 @@ export * from './paymentProofSchema';
 export * from './rentalSchemas';
 export * from './reportSchemas';
 export * from './verificationSchemas';
+export * from './wholeNumber';

@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { GARAGE_TYPE_CODES, RENTAL_TYPE_CODES, VEHICLE_TYPE_CODES, VehicleFactory } from '@/domain';
 import { paymentProofSchema } from './paymentProofSchema';
+import { wholeNumber } from './wholeNumber';
 
 /** Pesan untuk kapasitas baterai yang bukan angka positif dengan satu desimal. */
 const PESAN_BATERAI = 'Kapasitas baterai berupa angka positif dengan paling banyak satu desimal';
@@ -96,11 +97,13 @@ export function createRentalSchema(maxDays: number) {
           .transform(Number)
           .optional(),
         rentalType: z.enum(RENTAL_TYPE_CODES, { error: 'Pilih tipe sewa' }),
-        days: z.coerce
-          .number({ error: 'Jumlah hari wajib diisi angka' })
-          .int({ error: 'Jumlah hari harus bilangan bulat' })
-          .min(1, { error: 'Jumlah hari paling sedikit 1' })
-          .max(maxDays, { error: pesanHari })
+        days: wholeNumber('Jumlah hari wajib diisi angka', 'Jumlah hari harus bilangan bulat')
+          .pipe(
+            z
+              .number()
+              .min(1, { error: 'Jumlah hari paling sedikit 1' })
+              .max(maxDays, { error: pesanHari }),
+          )
           .optional(),
         garageType: z.enum(GARAGE_TYPE_CODES, { error: 'Pilih tipe garasi' }),
         garageId: z
