@@ -14,8 +14,11 @@ import { env } from './config/env.js';
 import { UserRepository } from './repositories/UserRepository.js';
 import { AuthService } from './services/AuthService.js';
 import { VerificationService } from './services/VerificationService.js';
+import { GarageRepository } from './repositories/GarageRepository.js';
+import { GarageService } from './services/GarageService.js';
 import { AuthController } from './controllers/AuthController.js';
 import { VerificationController } from './controllers/VerificationController.js';
+import { GarageController } from './controllers/GarageController.js';
 import { DashboardController } from './controllers/DashboardController.js';
 import { createAttachUser } from './middleware/auth.js';
 import { createRouter } from './routes/index.js';
@@ -119,6 +122,7 @@ export function createApp({ prisma, pgPool }) {
 
   // Repository -> service -> controller disusun di sini (composition root).
   const userRepository = new UserRepository(prisma);
+  const garageRepository = new GarageRepository(prisma);
 
   // Dipasang sebelum proteksi CSRF agar halaman error 403 pun tahu siapa penggunanya.
   app.use(createAttachUser(userRepository));
@@ -127,10 +131,12 @@ export function createApp({ prisma, pgPool }) {
 
   const authService = new AuthService(userRepository);
   const verificationService = new VerificationService(userRepository);
+  const garageService = new GarageService(garageRepository);
   const controllers = {
     auth: new AuthController(authService),
     dashboard: new DashboardController(),
     verification: new VerificationController(verificationService),
+    garage: new GarageController(garageService),
   };
   app.use(createRouter(controllers));
 

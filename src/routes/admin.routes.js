@@ -19,5 +19,7 @@ export function createAdminRouter(controllers) {
   router.get('/pendaftar', controllers.verification.index);
   router.post('/pendaftar/:id/keputusan', controllers.verification.decide);
 
+  router.get('/garasi', controllers.garage.index);
+
   return router;
 }
