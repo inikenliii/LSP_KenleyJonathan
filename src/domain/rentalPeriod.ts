@@ -166,3 +166,22 @@ export function formatTanggal(date: Date): string {
     timeZone: 'UTC',
   }).format(date);
 }
+
+/**
+ * Memformat waktu simpan (tanggal dan jam) dalam Bahasa Indonesia, zona Asia/Jakarta.
+ *
+ * @param date Waktu yang diformat.
+ * @returns Teks seperti "21 November 2026 14.30".
+ * @example
+ * formatTanggalWaktu(new Date('2026-11-21T07:30:00Z')); // "21 November 2026 14.30"
+ */
+export function formatTanggalWaktu(date: Date): string {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: RENTAL_TIME_ZONE,
+  }).format(date);
+}
