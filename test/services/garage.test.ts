@@ -37,6 +37,29 @@ async function galatValidasi(input: Record<string, string>): Promise<ValidationE
 }
 
 describe('GarageService.createBatch', () => {
+  it('menyimpan harga harian persis untuk batch dengan jumlah berapa pun', async () => {
+    for (const quantity of [1, 2, 3, 4]) {
+      await service.createBatch({
+        type: 'BICYCLE',
+        quantity: String(quantity),
+        dailyPrice: '2000',
+      });
+    }
+
+    const konfigurasi = await prisma.garageTypeConfig.findUniqueOrThrow({
+      where: { type: 'BICYCLE' },
+    });
+    expect(konfigurasi.dailyPrice).toBe(2000);
+    expect(konfigurasi.lastNumber).toBe(10);
+
+    const garasi = await prisma.garage.findMany({
+      where: { type: 'BICYCLE' },
+      orderBy: { id: 'asc' },
+    });
+    expect(garasi).toHaveLength(10);
+    expect(garasi.every((item) => item.status === 'AVAILABLE')).toBe(true);
+  });
+
   it('batch Sepeda pertama menghasilkan S001 sampai S003 dan menyimpan harga', async () => {
     const hasil = await service.createBatch({ type: 'BICYCLE', quantity: '3', dailyPrice: '10000' });
 
