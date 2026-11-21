@@ -20,3 +20,15 @@ Jalankan `npm start` untuk membangun aplikasi dan melayaninya di http://localhos
 ## Pengujian
 
 Jalankan `npm test`. Pengujian hanya memakai dan mengosongkan database `_test`, bukan database aplikasi.
+
+## Fitur
+
+- Admin: verifikasi pendaftar, buat garasi berkelompok dan daftar garasi, Perpanjangan sewa (harian atau bulanan), serta laporan penyewaan per bulan, per hari, per tipe garasi, dan per penyewa.
+- Penyewa: registrasi, sewa baru (harian atau bulanan), dan melihat sewa saya.
+
+## Dokumen
+
+- [Laporan uji praktik](docs/laporan.md): library, arsitektur, aturan bisnis, tangkapan layar, dan cara menjalankan.
+- [Skenario pengujian](docs/skenario-pengujian.md): skenario tes otomatis beserta hasilnya.
+- [Diagram](docs/diagram/): use case, class diagram, dan ERD (berkas draw.io).
+- Dokumentasi API: jalankan `npm run docs`, lalu buka `docs/api/index.html` (folder ini dibuat ulang setiap kali dan tidak disimpan di repositori).
