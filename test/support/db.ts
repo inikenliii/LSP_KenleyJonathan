@@ -38,13 +38,13 @@ export function createTestPrisma(): PrismaClient {
 }
 
 /**
- * Mengosongkan semua tabel (termasuk sewa), mengulang penomoran id, lalu mengisi ulang satu
- * konfigurasi per tipe garasi agar keadaan awal tiap tes sama.
+ * Mengosongkan semua tabel (termasuk sewa dan perpanjangannya), mengulang penomoran id, lalu
+ * mengisi ulang satu konfigurasi per tipe garasi agar keadaan awal tiap tes sama.
  *
  * @param prisma Klien Prisma milik database uji.
  */
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
-  await prisma.$executeRaw`TRUNCATE TABLE "rentals", "users", "garages", "garage_type_configs", "session" RESTART IDENTITY CASCADE`;
+  await prisma.$executeRaw`TRUNCATE TABLE "rental_extensions", "rentals", "users", "garages", "garage_type_configs", "session" RESTART IDENTITY CASCADE`;
   await prisma.garageTypeConfig.createMany({
     data: Object.values(GarageType).map((type) => ({ type })),
   });
