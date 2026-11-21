@@ -1,0 +1,26 @@
+{% extends "layout.njk" %}
+
+{% block title %}Beranda - {{ appName }}{% endblock %}
+
+{% block content %}
+<h1>Sistem Penyewaan Garasi</h1>
+<p>Kami menyewakan garasi untuk Sepeda, Mobil, dan Mobil Listrik. Garasi dapat disewa secara harian (Harian) atau bulanan (Bulanan).</p>
+
+<div class="card-grid">
+  <section class="card">
+    <h2>Sepeda</h2>
+    <p>Garasi ringkas untuk menyimpan sepeda dengan aman.</p>
+  </section>
+  <section class="card">
+    <h2>Mobil</h2>
+    <p>Garasi luas untuk mobil bahan bakar bensin.</p>
+  </section>
+  <section class="card">
+    <h2>Mobil Listrik</h2>
+    <p>Garasi dengan fasilitas pengisian daya, tarif listrik dihitung per kWh.</p>
+  </section>
+</div>
+
+<p><a class="btn btn--primary" href="/register">Daftar sebagai Penyewa</a></p>
+<p class="field-hint">Akun baru akan diverifikasi oleh admin (pemeriksaan KTP) sebelum dapat menyewa garasi.</p>
+{% endblock %}

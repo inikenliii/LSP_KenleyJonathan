@@ -192,3 +192,34 @@ export class CapacityExceededError extends AppError {
     this.max = max;
   }
 }
+
+/**
+ * Kegagalan tak terduga saat mengakses database. Pesan untuk pengguna dibuat
+ * umum; penyebab teknis disimpan di `cause` dan hanya dicatat di server.
+ */
+export class DatabaseError extends AppError {
+  /**
+   * @param {string} [message] Pesan umum untuk pengguna.
+   * @param {object} [options]
+   * @param {unknown} [options.cause] Error asli penyebab kegagalan.
+   */
+  constructor(message = 'Terjadi kesalahan pada database. Silakan coba lagi nanti.', { cause } = {}) {
+    super(message, { statusCode: 500, code: 'DATABASE_ERROR' });
+    this.cause = cause;
+  }
+}
+
+/**
+ * Mengubah error apa pun menjadi AppError. AppError dikembalikan apa adanya,
+ * sedangkan error lain dibungkus sebagai DatabaseError dengan error asli
+ * sebagai penyebab.
+ *
+ * @param {unknown} err Error yang tertangkap.
+ * @returns {AppError} Error yang aman ditangani penanganan error pusat.
+ */
+export function toAppError(err) {
+  if (err instanceof AppError) {
+    return err;
+  }
+  return new DatabaseError(undefined, { cause: err });
+}

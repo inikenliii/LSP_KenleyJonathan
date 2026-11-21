@@ -1,0 +1,62 @@
+/* Stylesheet tunggal aplikasi penyewaan garasi (tanpa CDN). */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1f2933;
+  background: #f7f8fa;
+}
+
+a { color: #0b5cad; }
+
+:focus-visible { outline: 3px solid #0b5cad; outline-offset: 2px; }
+
+.container { max-width: 72rem; margin: 0 auto; padding: 0 16px; }
+
+.site-header { background: #ffffff; border-bottom: 1px solid #d5dae1; }
+.site-header .container { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.site-title { font-weight: 700; font-size: 1.125rem; color: #1f2933; text-decoration: none; padding: 12px 0; }
+.site-nav ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.site-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; }
+.site-footer { padding-top: 24px; padding-bottom: 24px; color: #52606d; }
+
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 16px; margin: 24px 0; }
+.card { background: #ffffff; border: 1px solid #d5dae1; border-radius: 6px; padding: 16px; }
+.card h2 { margin-top: 0; font-size: 1.25rem; }
+
+.form { max-width: 32rem; background: #ffffff; border: 1px solid #d5dae1; border-radius: 6px; padding: 16px; }
+.form-field { margin-bottom: 16px; }
+.form-field label { display: block; font-weight: 700; margin-bottom: 4px; }
+.form-field input, .form-field select, .form-field textarea {
+  width: 100%; min-height: 44px; padding: 8px 12px; font: inherit; border: 1px solid #7b8794; border-radius: 4px;
+}
+.form-field [aria-invalid="true"] { border-color: #b42318; border-width: 2px; }
+.field-hint { color: #52606d; margin: 4px 0 0; }
+.field-error { color: #b42318; font-weight: 700; margin: 4px 0 0; }
+.error-summary { background: #fdecea; border-left: 6px solid #b42318; padding: 12px 16px; margin-bottom: 16px; }
+.error-summary ul { margin: 0; padding-left: 20px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px;
+  font: inherit; font-weight: 700; border: 2px solid transparent; border-radius: 4px; cursor: pointer; text-decoration: none;
+}
+.btn--primary { background: #0b5cad; color: #ffffff; }
+.btn--secondary { background: #ffffff; color: #0b5cad; border-color: #0b5cad; }
+.btn--danger { background: #b42318; color: #ffffff; }
+
+.alert { padding: 12px 16px; margin: 16px 0; background: #ffffff; border: 1px solid #d5dae1; border-left: 6px solid #52606d; }
+.alert--success { border-left-color: #1a7f37; background: #e9f7ee; }
+.alert--error { border-left-color: #b42318; background: #fdecea; }
+.alert--info { border-left-color: #0b5cad; background: #e8f1fb; }
+
+.table-wrapper { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; background: #ffffff; }
+.table th, .table td { border: 1px solid #d5dae1; padding: 8px; text-align: left; }
+
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.875rem; font-weight: 700; background: #e4e7eb; color: #1f2933; }
+.badge--available { background: #d7f0df; color: #0f5a26; }
+.badge--used { background: #fde2d9; color: #8a2a0e; }
+.badge--pending { background: #fff1c2; color: #6b4e00; }
