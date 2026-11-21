@@ -2,9 +2,9 @@
 // URL koneksi tidak ditulis di sini; lihat prisma.config.ts.
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated"
-  moduleFormat = "esm"
+  provider            = "prisma-client"
+  output              = "../src/generated"
+  moduleFormat        = "esm"
   importFileExtension = "ts"
 }
 
@@ -43,6 +43,7 @@ model User {
   verifiedUsers      User[]             @relation("UserVerifications")
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
+  rentals            Rental[]
 
   // Daftar pendaftar selalu difilter menurut peran dan status verifikasi.
   @@index([role, verificationStatus])
@@ -94,8 +95,54 @@ model Garage {
   status    GarageStatus     @default(AVAILABLE)
   config    GarageTypeConfig @relation(fields: [type], references: [type])
   createdAt DateTime         @default(now()) @map("created_at")
+  rentals   Rental[]
 
   // Daftar garasi dan pemeriksaan ketersediaan selalu memfilter tipe dan status.
   @@index([type, status])
   @@map("garages")
+}
+
+// Tipe kendaraan yang disewakan garasinya.
+enum VehicleType {
+  SEPEDA
+  SEPEDA_MOTOR
+  MOBIL
+  MOBIL_LISTRIK
+}
+
+// Jenis sewa: per hari atau per bulan.
+enum RentalType {
+  HARIAN
+  BULANAN
+}
+
+// Satu transaksi sewa garasi oleh penyewa. Tanggal berupa tanggal saja (tanpa jam);
+// harga disimpan sebagai salinan saat sewa dibuat agar perubahan harga tidak mengubah riwayat.
+model Rental {
+  id               Int         @id @default(autoincrement())
+  renterId         Int         @map("renter_id")
+  renter           User        @relation(fields: [renterId], references: [id])
+  garageId         String      @map("garage_id") @db.VarChar(4)
+  garage           Garage      @relation(fields: [garageId], references: [id])
+  vehicleType      VehicleType @map("vehicle_type")
+  plateNumber      String?     @map("plate_number") @db.VarChar(12) // kosong untuk sepeda
+  vehicleBrand     String      @map("vehicle_brand") @db.VarChar(50)
+  vehicleModel     String      @map("vehicle_model") @db.VarChar(50)
+  batteryKwh       Decimal?    @map("battery_kwh") @db.Decimal(5, 1) // hanya mobil listrik
+  rentalType       RentalType  @map("rental_type")
+  days             Int? // hanya sewa harian
+  startDate        DateTime    @map("start_date") @db.Date
+  endDate          DateTime    @map("end_date") @db.Date
+  dailyPrice       Int         @map("daily_price") // salinan harga harian tipe garasi
+  pricePerKwh      Int?        @map("price_per_kwh") // salinan harga per kWh, hanya bila baterai diisi penuh
+  chargeCost       Int         @default(0) @map("charge_cost")
+  totalCost        Int         @map("total_cost") // rupiah utuh
+  paymentProofFile String      @map("payment_proof_file") @db.VarChar(64) // nama file saja
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  // Halaman Sewa Saya selalu memfilter sewa menurut penyewa.
+  @@index([renterId])
+  // Pelepasan garasi memeriksa sewa yang masih aktif per garasi menurut tanggal selesai.
+  @@index([garageId, endDate])
+  @@map("rentals")
 }
