@@ -3,7 +3,9 @@
  * konfigurasi per tipe.
  */
 import { Garage, GARAGE_TYPE_CODES, createGarage } from '../domain/garage/index.js';
-import { toAppError } from '../domain/errors.js';
+import { GarageIdGenerator } from '../domain/GarageIdGenerator.js';
+import { ValidationError, toAppError } from '../domain/errors.js';
+import { garageBatchSchema } from '../validation/garageSchemas.js';
 
 /**
  * Menangani konfigurasi per tipe garasi dan pembuatan garasi berkelompok.
@@ -12,9 +14,9 @@ import { toAppError } from '../domain/errors.js';
 export class GarageService {
   /**
    * @param {import('../repositories/GarageRepository.js').GarageRepository} garageRepository Repository garasi.
-   * @param {object|null} [idGenerator] Perencana ID garasi.
+   * @param {GarageIdGenerator} [idGenerator] Perencana ID garasi.
    */
-  constructor(garageRepository, idGenerator = null) {
+  constructor(garageRepository, idGenerator = new GarageIdGenerator()) {
     this.garageRepository = garageRepository;
     this.idGenerator = idGenerator;
   }
@@ -45,6 +47,37 @@ export class GarageService {
           remainingQuota: Garage.MAX_PER_TYPE - row.lastNumber,
         };
       });
+    } catch (err) {
+      throw toAppError(err);
+    }
+  }
+
+  /**
+   * Membuat garasi berkelompok: memvalidasi masukan, lalu menyimpan batch dan
+   * harga tipe dalam satu transaksi.
+   *
+   * @param {object} input Isian formulir (type, quantity, dailyPrice, pricePerKwh).
+   * @returns {Promise<{ typeLabel: string, count: number, firstId: string, lastId: string, ids: string[], summary: string }>}
+   * @throws {ValidationError} Bila masukan tidak valid.
+   * @throws {import('../domain/errors.js').CapacityExceededError} Bila batch melebihi 999 garasi untuk tipe ini.
+   * @throws {import('../domain/errors.js').DatabaseError} Bila terjadi kegagalan tak terduga.
+   */
+  async createBatch(input) {
+    const data = ValidationError.parse(garageBatchSchema, input ?? {});
+    const garage = createGarage(data.type);
+    try {
+      const result = await this.garageRepository.createBatch(data, (lastNumber) =>
+        this.idGenerator.planBatch(garage, lastNumber, data.quantity),
+      );
+      return {
+        typeLabel: garage.typeLabel(),
+        count: result.ids.length,
+        firstId: result.ids[0],
+        lastId: result.ids[result.ids.length - 1],
+        ids: result.ids,
+        // describe dipanggil sama untuk semua tipe; setiap subkelas menjawab dengan caranya.
+        summary: createGarage(data.type, result.ids[0]).describe(data.dailyPrice, data.pricePerKwh ?? null),
+      };
     } catch (err) {
       throw toAppError(err);
     }
