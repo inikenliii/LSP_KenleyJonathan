@@ -250,9 +250,8 @@ export function ExtensionForm({
             onChange={handleFileChange}
             aria-invalid={pesanBerkas ? true : undefined}
           />
-          {pesanBerkas ? (
-            <FieldError>{pesanBerkas}</FieldError>
-          ) : (
+          {pesanBerkas && <FieldError>{pesanBerkas}</FieldError>}
+          {(!pesanBerkas || perluPilihUlang) && (
             <FieldDescription>
               {perluPilihUlang
                 ? 'Pilih ulang berkas bukti pembayaran; berkas tidak disimpan setelah ada kesalahan.'
