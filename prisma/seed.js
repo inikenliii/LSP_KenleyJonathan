@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { prisma, disconnectDatabase } from '../src/db/prisma.js';
 import { User } from '../src/domain/User.js';
+import { GARAGE_TYPE_CODES } from '../src/domain/garage/index.js';
 
 dotenv.config({ quiet: true });
 
@@ -53,6 +54,19 @@ async function seedAdmin() {
 }
 
 /**
+ * Membuat satu baris konfigurasi untuk setiap tipe garasi. Baris yang sudah
+ * ada dibiarkan, sehingga harga dan penghitung ID tidak tertimpa.
+ *
+ * @returns {Promise<void>}
+ */
+async function seedGarageTypeConfigs() {
+  await prisma.garageTypeConfig.createMany({
+    data: GARAGE_TYPE_CODES.map((type) => ({ type })),
+    skipDuplicates: true,
+  });
+}
+
+/**
  * Titik masuk seed.
  *
  * @returns {Promise<void>}
@@ -60,6 +74,8 @@ async function seedAdmin() {
 async function main() {
   await seedAdmin();
   console.log('Seed selesai: akun admin siap.');
+  await seedGarageTypeConfigs();
+  console.log('Seed selesai: konfigurasi 3 tipe garasi siap.');
 }
 
 try {
