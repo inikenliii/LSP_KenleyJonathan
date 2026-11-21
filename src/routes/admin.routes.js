@@ -16,6 +16,7 @@ export function createAdminRouter(controllers) {
   router.use(requireRole(User.ROLE.ADMIN));
 
   router.get('/', controllers.dashboard.admin);
+  router.get('/pendaftar', controllers.verification.index);
 
   return router;
 }

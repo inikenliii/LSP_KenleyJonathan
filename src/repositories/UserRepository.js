@@ -99,4 +99,18 @@ export class UserRepository {
     const row = await this.prisma.user.findUnique({ where: { id }, select: PUBLIC_USER_SELECT });
     return row === null ? null : User.fromRecord(row);
   }
+
+  /**
+   * Mengambil penyewa yang masih menunggu verifikasi, dari yang paling lama mendaftar.
+   *
+   * @returns {Promise<User[]>} Daftar penyewa berstatus PENDING.
+   */
+  async findPendingRenters() {
+    const rows = await this.prisma.user.findMany({
+      where: { role: User.ROLE.RENTER, verificationStatus: User.STATUS.PENDING },
+      orderBy: { createdAt: 'asc' },
+      select: PUBLIC_USER_SELECT,
+    });
+    return rows.map((row) => User.fromRecord(row));
+  }
 }

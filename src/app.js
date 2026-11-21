@@ -13,7 +13,9 @@ import { csrfSync } from 'csrf-sync';
 import { env } from './config/env.js';
 import { UserRepository } from './repositories/UserRepository.js';
 import { AuthService } from './services/AuthService.js';
+import { VerificationService } from './services/VerificationService.js';
 import { AuthController } from './controllers/AuthController.js';
+import { VerificationController } from './controllers/VerificationController.js';
 import { DashboardController } from './controllers/DashboardController.js';
 import { createAttachUser } from './middleware/auth.js';
 import { createRouter } from './routes/index.js';
@@ -124,9 +126,11 @@ export function createApp({ prisma, pgPool }) {
   app.use(csrfSynchronisedProtection);
 
   const authService = new AuthService(userRepository);
+  const verificationService = new VerificationService(userRepository);
   const controllers = {
     auth: new AuthController(authService),
     dashboard: new DashboardController(),
+    verification: new VerificationController(verificationService),
   };
   app.use(createRouter(controllers));
 
