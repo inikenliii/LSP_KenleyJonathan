@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, type ChangeEvent } from 'react';
+import { useActionState, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { createRentalAction } from '@/app/penyewa/sewa/actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -30,8 +30,9 @@ import {
   type RentalTypeCode,
   type VehicleTypeCode,
 } from '@/domain';
-import { INITIAL_ACTION_STATE } from '@/lib/action-state';
+import { INITIAL_ACTION_STATE, type ActionState } from '@/lib/action-state';
 import type { AvailableGarageOption } from '@/services';
+import { submitWithoutReset } from './submit-form';
 
 /** Kelas tampilan pilihan tipe agar serupa dengan kotak isian. */
 const KELAS_PILIHAN =
@@ -140,6 +141,11 @@ function previewCost(input: {
  * berakhir dan biaya dipratinjau di browser dengan fungsi domain yang sama
  * dengan server, dan pesan error server tampil di bawah field masing-masing.
  *
+ * Semua kontrol dikendalikan state (nilai awal dari `state.values` bila ada) dan formulir
+ * dikirim lewat `onSubmit` agar React tidak mereset pilihan dan isian setelah server menolak;
+ * ringkasan biaya selalu sesuai dengan isian yang terkirim. Hanya kotak berkas yang
+ * dikosongkan setelah galat karena berkas tidak bisa dipulihkan.
+ *
  * @param props.today Tanggal mulai (hari ini di Jakarta), `YYYY-MM-DD`.
  * @param props.todayLabel Tanggal mulai dalam Bahasa Indonesia.
  * @param props.maxDailyDays Batas jumlah hari sewa harian bulan ini.
@@ -160,16 +166,38 @@ export function RentalForm({
   const [state, formAction, pending] = useActionState(createRentalAction, INITIAL_ACTION_STATE);
   const galat = state.fieldErrors ?? {};
 
-  const [vehicleType, setVehicleType] = useState<VehicleTypeCode>('SEPEDA');
-  const [rentalType, setRentalType] = useState<RentalTypeCode>('HARIAN');
-  const [days, setDays] = useState('');
-  const [garageType, setGarageType] = useState<GarageTypeCode>(
-    () => VehicleFactory.create('SEPEDA').allowedGarageTypes()[0],
+  const awal = state.values;
+  const [vehicleType, setVehicleType] = useState<VehicleTypeCode>(
+    VEHICLE_TYPE_CODES.find((kode) => kode === awal?.vehicleType) ?? 'SEPEDA',
   );
-  const [garageId, setGarageId] = useState('');
-  const [batteryKwh, setBatteryKwh] = useState('');
-  const [remainingKwh, setRemainingKwh] = useState('');
+  const [rentalType, setRentalType] = useState<RentalTypeCode>(
+    RENTAL_TYPE_CODES.find((kode) => kode === awal?.rentalType) ?? 'HARIAN',
+  );
+  const [days, setDays] = useState(awal?.days ?? '');
+  const [garageType, setGarageType] = useState<GarageTypeCode>(
+    () =>
+      VehicleFactory.create(vehicleType)
+        .allowedGarageTypes()
+        .find((kode) => kode === awal?.garageType) ??
+      VehicleFactory.create(vehicleType).allowedGarageTypes()[0],
+  );
+  const [garageId, setGarageId] = useState(awal?.garageId ?? '');
+  const [plateNumber, setPlateNumber] = useState(awal?.plateNumber ?? '');
+  const [vehicleBrand, setVehicleBrand] = useState(awal?.vehicleBrand ?? '');
+  const [vehicleModel, setVehicleModel] = useState(awal?.vehicleModel ?? '');
+  const [batteryKwh, setBatteryKwh] = useState(awal?.batteryKwh ?? '');
+  const [remainingKwh, setRemainingKwh] = useState(awal?.remainingKwh ?? '');
   const [fileError, setFileError] = useState<string | null>(null);
+  const berkasRef = useRef<HTMLInputElement>(null);
+  // Hasil aksi terakhir tempat pengguna sudah memilih ulang berkas (untuk menyembunyikan petunjuk).
+  const [dipilihUlangUntuk, setDipilihUlangUntuk] = useState<ActionState | null>(null);
+
+  // Setelah galat server, berkas lama dikosongkan (tidak bisa dipulihkan); isian lain tetap.
+  useEffect(() => {
+    if (state.message && !state.ok && berkasRef.current) {
+      berkasRef.current.value = '';
+    }
+  }, [state]);
 
   const vehicle = VehicleFactory.create(vehicleType);
   const garageOptions = garages.filter((garasi) => garasi.type === garageType);
@@ -217,12 +245,18 @@ export function RentalForm({
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const berkas = event.target.files?.[0];
     setFileError(berkas !== undefined && berkas.size > PAYMENT_PROOF_MAX_BYTES ? PESAN_UKURAN : null);
+    setDipilihUlangUntuk(state);
   }
 
   const pesanBerkas = fileError ?? galat.paymentProof?.[0];
+  const perluPilihUlang = !state.ok && Boolean(state.message) && dipilihUlangUntuk !== state;
 
   return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
+    <form
+      onSubmit={(event) => submitWithoutReset(event, formAction)}
+      className="flex flex-col gap-5"
+      noValidate
+    >
       {state.message && (
         <Alert aria-live="polite" variant={state.ok ? 'default' : 'destructive'}>
           <AlertDescription>{state.message}</AlertDescription>
@@ -256,7 +290,8 @@ export function RentalForm({
               id="plateNumber"
               name="plateNumber"
               autoComplete="off"
-              defaultValue={state.values?.plateNumber}
+              value={plateNumber}
+              onChange={(event) => setPlateNumber(event.target.value)}
               aria-invalid={galat.plateNumber?.[0] ? true : undefined}
             />
             {galat.plateNumber?.[0] && <FieldError>{galat.plateNumber[0]}</FieldError>}
@@ -269,7 +304,8 @@ export function RentalForm({
             id="vehicleBrand"
             name="vehicleBrand"
             autoComplete="off"
-            defaultValue={state.values?.vehicleBrand}
+            value={vehicleBrand}
+            onChange={(event) => setVehicleBrand(event.target.value)}
             aria-invalid={galat.vehicleBrand?.[0] ? true : undefined}
           />
           {galat.vehicleBrand?.[0] && <FieldError>{galat.vehicleBrand[0]}</FieldError>}
@@ -281,7 +317,8 @@ export function RentalForm({
             id="vehicleModel"
             name="vehicleModel"
             autoComplete="off"
-            defaultValue={state.values?.vehicleModel}
+            value={vehicleModel}
+            onChange={(event) => setVehicleModel(event.target.value)}
             aria-invalid={galat.vehicleModel?.[0] ? true : undefined}
           />
           {galat.vehicleModel?.[0] && <FieldError>{galat.vehicleModel[0]}</FieldError>}
@@ -462,6 +499,7 @@ export function RentalForm({
             id="paymentProof"
             name="paymentProof"
             type="file"
+            ref={berkasRef}
             accept="image/jpeg,image/png,image/webp"
             onChange={handleFileChange}
             aria-invalid={pesanBerkas ? true : undefined}
@@ -470,7 +508,9 @@ export function RentalForm({
             <FieldError>{pesanBerkas}</FieldError>
           ) : (
             <FieldDescription>
-              JPEG, PNG, atau WebP, maksimal 2 MB. Pilih ulang berkas bila ada kesalahan.
+              {perluPilihUlang
+                ? 'Pilih ulang berkas bukti pembayaran; berkas tidak disimpan setelah ada kesalahan.'
+                : 'JPEG, PNG, atau WebP, maksimal 2 MB. Pilih ulang berkas bila ada kesalahan.'}
             </FieldDescription>
           )}
         </Field>

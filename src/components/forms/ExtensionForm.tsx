@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, type ChangeEvent } from 'react';
+import { useActionState, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { extendRentalAction } from '@/app/admin/perpanjangan/actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,9 @@ import {
   type ExtensionCostBreakdown,
   type RentalTypeCode,
 } from '@/domain';
-import { INITIAL_ACTION_STATE } from '@/lib/action-state';
+import { INITIAL_ACTION_STATE, type ActionState } from '@/lib/action-state';
+import { describeExtensionChoice } from './form-summaries';
+import { submitWithoutReset } from './submit-form';
 
 /** Kelas tampilan pilihan jenis agar serupa dengan kotak isian. */
 const KELAS_PILIHAN =
@@ -75,6 +77,11 @@ function previewExtension(
  * bulan dengan pratinjau tanggal selesai baru, tambahan hari, dan sisa biaya, serta
  * unggahan bukti pembayaran perpanjangan. Pesan error server tampil di bawah field masing-masing.
  *
+ * Semua kontrol dikendalikan state dan formulir dikirim lewat `onSubmit` (bukan atribut
+ * `action`) agar React tidak mereset kontrol setelah server menolak: yang tampil di layar
+ * selalu sama dengan yang terkirim. Hanya kotak berkas yang dikosongkan setelah galat
+ * karena berkas tidak bisa dipulihkan; pengguna diminta memilihnya lagi.
+ *
  * @param props.rentalId Id sewa yang diperpanjang (dikirim sebagai field tersembunyi).
  * @param props.currentEndDate Tanggal selesai saat ini, `YYYY-MM-DD`.
  * @param props.currentEndDateLabel Tanggal selesai saat ini dalam Bahasa Indonesia.
@@ -103,6 +110,16 @@ export function ExtensionForm({
   );
   const [quantity, setQuantity] = useState(state.values?.quantity ?? '');
   const [fileError, setFileError] = useState<string | null>(null);
+  const berkasRef = useRef<HTMLInputElement>(null);
+  // Hasil aksi terakhir tempat pengguna sudah memilih ulang berkas (untuk menyembunyikan petunjuk).
+  const [dipilihUlangUntuk, setDipilihUlangUntuk] = useState<ActionState | null>(null);
+
+  // Setelah galat server, berkas lama dikosongkan (tidak bisa dipulihkan); isian lain tetap.
+  useEffect(() => {
+    if (state.message && !state.ok && berkasRef.current) {
+      berkasRef.current.value = '';
+    }
+  }, [state]);
 
   const preview = previewExtension(extensionType, quantity, currentEndDate, dailyPrice);
   const satuan = extensionType === 'BULANAN' ? 'bulan' : 'hari';
@@ -115,12 +132,19 @@ export function ExtensionForm({
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const berkas = event.target.files?.[0];
     setFileError(berkas !== undefined && berkas.size > PAYMENT_PROOF_MAX_BYTES ? PESAN_UKURAN : null);
+    setDipilihUlangUntuk(state);
   }
 
   const pesanBerkas = fileError ?? galat.paymentProof?.[0];
+  const perluPilihUlang = !state.ok && Boolean(state.message) && dipilihUlangUntuk !== state;
+  const jumlahBiaya = preview !== null && !('error' in preview) ? preview.amount : null;
 
   return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
+    <form
+      onSubmit={(event) => submitWithoutReset(event, formAction)}
+      className="flex flex-col gap-5"
+      noValidate
+    >
       {state.message && (
         <Alert aria-live="polite" variant={state.ok ? 'default' : 'destructive'}>
           <AlertDescription>{state.message}</AlertDescription>
@@ -221,6 +245,7 @@ export function ExtensionForm({
             id="paymentProof"
             name="paymentProof"
             type="file"
+            ref={berkasRef}
             accept="image/jpeg,image/png,image/webp"
             onChange={handleFileChange}
             aria-invalid={pesanBerkas ? true : undefined}
@@ -229,15 +254,22 @@ export function ExtensionForm({
             <FieldError>{pesanBerkas}</FieldError>
           ) : (
             <FieldDescription>
-              JPEG, PNG, atau WebP, maksimal 2 MB. Pilih ulang berkas bila ada kesalahan.
+              {perluPilihUlang
+                ? 'Pilih ulang berkas bukti pembayaran; berkas tidak disimpan setelah ada kesalahan.'
+                : 'JPEG, PNG, atau WebP, maksimal 2 MB. Pilih ulang berkas bila ada kesalahan.'}
             </FieldDescription>
           )}
         </Field>
       </FieldGroup>
 
-      <Button type="submit" size="lg" disabled={pending || fileError !== null}>
-        {pending ? 'Menyimpan...' : 'Simpan Perpanjangan'}
-      </Button>
+      <div className="flex flex-col gap-2">
+        <Button type="submit" size="lg" disabled={pending || fileError !== null}>
+          {pending ? 'Menyimpan...' : 'Simpan Perpanjangan'}
+        </Button>
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {describeExtensionChoice(extensionType, quantity, jumlahBiaya)}
+        </p>
+      </div>
     </form>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { createGarageBatchAction } from '@/app/admin/garasi/actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import type { GarageTypeCode } from '@/domain';
 import { INITIAL_ACTION_STATE } from '@/lib/action-state';
+import { submitWithoutReset } from './submit-form';
 
 /** Kelas tampilan pilihan tipe agar serupa dengan kotak isian. */
 const KELAS_PILIHAN =
@@ -22,7 +23,9 @@ const KELAS_PILIHAN =
 /**
  * Formulir pembuatan garasi berkelompok: tipe, jumlah, harga harian, dan
  * harga per kWh (wajib hanya untuk Mobil Listrik). Pesan error tampil di
- * bawah field yang bermasalah dan isian lama dipertahankan.
+ * bawah field yang bermasalah dan isian lama dipertahankan: semua kontrol dikendalikan state
+ * dan formulir dikirim lewat `onSubmit` agar React tidak mereset pilihan tipe setelah server
+ * menolak. Setelah berhasil, isian dikosongkan dan tipe kembali ke pilihan pertama.
  *
  * @param props.typeOptions Pilihan tipe garasi (kode dan nama tampilan).
  * @returns Formulir dengan tombol "Buat Garasi" dan kotak pesan hasil.
@@ -38,8 +41,30 @@ export function GarageBatchForm({
   );
   const galat = state.fieldErrors ?? {};
 
+  const tipeAwal = typeOptions[0]?.value ?? '';
+  const [type, setType] = useState(state.values?.type ?? tipeAwal);
+  const [quantity, setQuantity] = useState(state.values?.quantity ?? '');
+  const [dailyPrice, setDailyPrice] = useState(state.values?.dailyPrice ?? '');
+  const [pricePerKwh, setPricePerKwh] = useState(state.values?.pricePerKwh ?? '');
+
+  // Setelah hasil baru berupa berhasil, kosongkan isian (penyesuaian state saat render).
+  const [hasilDitangani, setHasilDitangani] = useState(state);
+  if (hasilDitangani !== state) {
+    setHasilDitangani(state);
+    if (state.ok) {
+      setType(tipeAwal);
+      setQuantity('');
+      setDailyPrice('');
+      setPricePerKwh('');
+    }
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
+    <form
+      onSubmit={(event) => submitWithoutReset(event, formAction)}
+      className="flex flex-col gap-5"
+      noValidate
+    >
       {state.message && (
         <Alert aria-live="polite" variant={state.ok ? 'default' : 'destructive'}>
           <AlertDescription>{state.message}</AlertDescription>
@@ -53,7 +78,8 @@ export function GarageBatchForm({
             id="type"
             name="type"
             className={KELAS_PILIHAN}
-            defaultValue={state.values?.type ?? typeOptions[0]?.value}
+            value={type}
+            onChange={(event) => setType(event.target.value)}
             aria-invalid={galat.type?.[0] ? true : undefined}
           >
             {typeOptions.map((opsi) => (
@@ -73,7 +99,8 @@ export function GarageBatchForm({
             type="number"
             min={1}
             max={999}
-            defaultValue={state.values?.quantity}
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
             aria-invalid={galat.quantity?.[0] ? true : undefined}
           />
           {galat.quantity?.[0] ? (
@@ -90,7 +117,8 @@ export function GarageBatchForm({
             name="dailyPrice"
             type="number"
             min={1}
-            defaultValue={state.values?.dailyPrice}
+            value={dailyPrice}
+            onChange={(event) => setDailyPrice(event.target.value)}
             aria-invalid={galat.dailyPrice?.[0] ? true : undefined}
           />
           {galat.dailyPrice?.[0] ? (
@@ -107,7 +135,8 @@ export function GarageBatchForm({
             name="pricePerKwh"
             type="number"
             min={1}
-            defaultValue={state.values?.pricePerKwh}
+            value={pricePerKwh}
+            onChange={(event) => setPricePerKwh(event.target.value)}
             aria-invalid={galat.pricePerKwh?.[0] ? true : undefined}
           />
           {galat.pricePerKwh?.[0] ? (
