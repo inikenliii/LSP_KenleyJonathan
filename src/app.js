@@ -14,6 +14,7 @@ import { env } from './config/env.js';
 import { UserRepository } from './repositories/UserRepository.js';
 import { AuthService } from './services/AuthService.js';
 import { AuthController } from './controllers/AuthController.js';
+import { DashboardController } from './controllers/DashboardController.js';
 import { createAttachUser } from './middleware/auth.js';
 import { createRouter } from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
@@ -123,7 +124,10 @@ export function createApp({ prisma, pgPool }) {
   app.use(csrfSynchronisedProtection);
 
   const authService = new AuthService(userRepository);
-  const controllers = { auth: new AuthController(authService) };
+  const controllers = {
+    auth: new AuthController(authService),
+    dashboard: new DashboardController(),
+  };
   app.use(createRouter(controllers));
 
   app.use(notFoundHandler);

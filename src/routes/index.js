@@ -2,6 +2,8 @@
  * @file Daftar rute aplikasi. Rute hanya menghubungkan URL ke controller.
  */
 import express from 'express';
+import { createAdminRouter } from './admin.routes.js';
+import { createRenterRouter } from './renter.routes.js';
 
 /**
  * Membuat router utama aplikasi.
@@ -22,6 +24,9 @@ export function createRouter(controllers = {}) {
   router.get('/login', controllers.auth.showLogin);
   router.post('/login', controllers.auth.login);
   router.post('/logout', controllers.auth.logout);
+
+  router.use('/admin', createAdminRouter(controllers));
+  router.use('/penyewa', createRenterRouter(controllers));
 
   return router;
 }

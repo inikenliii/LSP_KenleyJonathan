@@ -134,3 +134,57 @@ test('logout: keluar tanpa token CSRF ditolak', async () => {
   const stillIn = await client.get('/');
   assert.match(stillIn.text, /action="\/logout"/);
 });
+
+test('peran: admin membuka dasbor admin tetapi ditolak di halaman penyewa', async () => {
+  const client = new HttpClient(ctx.baseUrl);
+  const { email, password } = adminCredentials();
+  await client.login(email, password);
+
+  const dashboard = await client.get('/admin');
+  assert.equal(dashboard.status, 200);
+  assert.ok(dashboard.text.includes('Dasbor Admin'));
+
+  const renterArea = await client.get('/penyewa');
+  assert.equal(renterArea.status, 403);
+  assert.ok(renterArea.text.includes('tidak memiliki akses'));
+});
+
+test('peran: penyewa membuka beranda penyewa tetapi ditolak di halaman admin', async () => {
+  const data = await acceptedRenter(ctx);
+  const client = new HttpClient(ctx.baseUrl);
+  await client.login(data.email, data.password);
+
+  const home = await client.get('/penyewa');
+  assert.equal(home.status, 200);
+  assert.ok(home.text.includes('Beranda Penyewa'));
+  assert.ok(home.text.includes(data.fullName));
+
+  const adminArea = await client.get('/admin');
+  assert.equal(adminArea.status, 403);
+  assert.ok(adminArea.text.includes('tidak memiliki akses'));
+});
+
+test('peran: pengunjung diarahkan ke halaman masuk', async () => {
+  const client = new HttpClient(ctx.baseUrl);
+  for (const path of ['/admin', '/penyewa']) {
+    const result = await client.get(path);
+    assert.equal(result.status, 303);
+    assert.equal(result.location, '/login');
+  }
+});
+
+test('peran: akses dicabut saat status penyewa berubah setelah masuk', async () => {
+  const data = await acceptedRenter(ctx);
+  const client = new HttpClient(ctx.baseUrl);
+  await client.login(data.email, data.password);
+  assert.equal((await client.get('/penyewa')).status, 200);
+
+  await ctx.prisma.user.update({
+    where: { email: data.email.toLowerCase() },
+    data: { verificationStatus: 'REJECTED' },
+  });
+
+  const result = await client.get('/penyewa');
+  assert.equal(result.status, 303);
+  assert.equal(result.location, '/login');
+});

@@ -1,0 +1,16 @@
+{% extends "layout.njk" %}
+
+{% block title %}Dasbor Admin - {{ appName }}{% endblock %}
+
+{% block content %}
+<h1>Dasbor Admin</h1>
+<p>Selamat datang, {{ user.fullName }}.</p>
+
+<div class="card">
+  <h2>Akun Admin</h2>
+  <p>Email: {{ user.email }}</p>
+  <p>Peran: {{ user.roleLabel }}</p>
+</div>
+
+<p>Verifikasi pendaftar dan pengelolaan garasi dapat dibuka dari menu navigasi.</p>
+{% endblock %}

@@ -3,6 +3,7 @@
  * permintaan dan menyediakan helper jalur beranda sesuai peran.
  */
 import { User } from '../domain/User.js';
+import { ForbiddenError } from '../domain/errors.js';
 
 /**
  * Menentukan halaman beranda sesuai peran pengguna.
@@ -41,4 +42,61 @@ export function createAttachUser(userRepository) {
       next(err);
     }
   };
+}
+
+/**
+ * Mewajibkan pengguna sudah masuk; pengunjung dialihkan ke halaman masuk.
+ *
+ * @param {import('express').Request} req Permintaan.
+ * @param {import('express').Response} res Respons.
+ * @param {import('express').NextFunction} next Fungsi lanjut.
+ * @returns {void}
+ */
+export function requireAuth(req, res, next) {
+  if (req.user === null) {
+    res.redirect(303, '/login');
+    return;
+  }
+  next();
+}
+
+/**
+ * Membuat middleware yang hanya meloloskan pengguna dengan salah satu peran
+ * yang diizinkan. Pengunjung dialihkan ke halaman masuk, peran lain ditolak 403.
+ *
+ * @param {...string} roles Peran yang diizinkan (nilai User.ROLE).
+ * @returns {import('express').RequestHandler} Middleware Express.
+ */
+export function requireRole(...roles) {
+  return (req, res, next) => {
+    if (req.user === null) {
+      res.redirect(303, '/login');
+      return;
+    }
+    if (!roles.includes(req.user.role)) {
+      next(new ForbiddenError());
+      return;
+    }
+    next();
+  };
+}
+
+/**
+ * Hanya meloloskan penyewa yang sudah diterima admin (aturan penyewaan).
+ *
+ * @param {import('express').Request} req Permintaan.
+ * @param {import('express').Response} res Respons.
+ * @param {import('express').NextFunction} next Fungsi lanjut.
+ * @returns {void}
+ */
+export function requireVerifiedRenter(req, res, next) {
+  if (req.user === null) {
+    res.redirect(303, '/login');
+    return;
+  }
+  if (!req.user.canRent()) {
+    next(new ForbiddenError());
+    return;
+  }
+  next();
 }
