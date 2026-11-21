@@ -1,11 +1,18 @@
 import 'server-only';
 import { BcryptPasswordHasher } from '@/lib/password-hasher';
 import { prisma } from '@/lib/db';
-import { SessionRepository, UserRepository, type ISessionRepository } from '@/repositories';
+import {
+  GarageRepository,
+  SessionRepository,
+  UserRepository,
+  type ISessionRepository,
+} from '@/repositories';
 import {
   AuthService,
+  GarageService,
   VerificationService,
   type IAuthService,
+  type IGarageService,
   type IVerificationService,
 } from '@/services';
 
@@ -30,3 +37,6 @@ export const sessionRepository: ISessionRepository = new SessionRepository(prism
 
 /** Layanan verifikasi pendaftar di atas repository pengguna. */
 export const verificationService: IVerificationService = new VerificationService(userRepository);
+
+/** Layanan garasi di atas repository garasi. */
+export const garageService: IGarageService = new GarageService(new GarageRepository(prisma));

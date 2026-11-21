@@ -2,10 +2,11 @@ import type { ReactNode } from 'react';
 import { SiteHeader, type NavLink } from '@/components/layout/SiteHeader';
 import { requireRole } from '@/lib/auth/dal';
 
-/** Tautan navigasi area Admin; halaman Garasi ditambahkan pada tahap berikutnya. */
+/** Tautan navigasi area Admin. */
 const ADMIN_LINKS: ReadonlyArray<NavLink> = [
   { href: '/admin', label: 'Dasbor' },
   { href: '/admin/pendaftar', label: 'Pendaftar' },
+  { href: '/admin/garasi', label: 'Garasi' },
 ];
 
 /**
