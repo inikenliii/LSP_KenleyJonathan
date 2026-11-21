@@ -2,7 +2,12 @@ import 'server-only';
 import { BcryptPasswordHasher } from '@/lib/password-hasher';
 import { prisma } from '@/lib/db';
 import { SessionRepository, UserRepository, type ISessionRepository } from '@/repositories';
-import { AuthService, type IAuthService } from '@/services';
+import {
+  AuthService,
+  VerificationService,
+  type IAuthService,
+  type IVerificationService,
+} from '@/services';
 
 /**
  * @file Titik perakitan objek (composition root).
@@ -22,3 +27,6 @@ export const authService: IAuthService = new AuthService(userRepository, passwor
 
 /** Repository sesi login pada tabel session. */
 export const sessionRepository: ISessionRepository = new SessionRepository(prisma);
+
+/** Layanan verifikasi pendaftar di atas repository pengguna. */
+export const verificationService: IVerificationService = new VerificationService(userRepository);
