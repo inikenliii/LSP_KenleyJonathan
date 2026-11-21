@@ -9,11 +9,18 @@ export {
   type IGarageRepository,
 } from './IGarageRepository';
 export {
+  type ExtendableRentalRecord,
+  type ExtensionRecord,
+  type IRentalExtensionRepository,
+  type NewExtensionData,
+} from './IRentalExtensionRepository';
+export {
   type IRentalRepository,
   type NewRentalData,
   type RentalRecord,
 } from './IRentalRepository';
 export { type ISessionRepository } from './ISessionRepository';
+export { RentalExtensionRepository } from './RentalExtensionRepository';
 export { RentalRepository } from './RentalRepository';
 export {
   type IUserRepository,

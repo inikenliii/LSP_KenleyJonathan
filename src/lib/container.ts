@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { LocalPaymentProofStorage } from '@/lib/payment-proof-storage';
 import {
   GarageRepository,
+  RentalExtensionRepository,
   RentalRepository,
   SessionRepository,
   UserRepository,
@@ -12,10 +13,12 @@ import {
 import {
   AuthService,
   GarageService,
+  RentalExtensionService,
   RentalService,
   VerificationService,
   type IAuthService,
   type IGarageService,
+  type IRentalExtensionService,
   type IRentalService,
   type IVerificationService,
 } from '@/services';
@@ -48,5 +51,14 @@ export const garageService: IGarageService = new GarageService(new GarageReposit
 /** Layanan sewa di atas repository sewa dan penyimpanan bukti pembayaran lokal. */
 export const rentalService: IRentalService = new RentalService(
   new RentalRepository(prisma),
+  new LocalPaymentProofStorage(),
+);
+
+/**
+ * Layanan perpanjangan sewa. Bukti pembayaran perpanjangan memakai penyimpanan
+ * dan folder yang sama dengan bukti sewa; nama berkasnya UUID acak.
+ */
+export const rentalExtensionService: IRentalExtensionService = new RentalExtensionService(
+  new RentalExtensionRepository(prisma),
   new LocalPaymentProofStorage(),
 );

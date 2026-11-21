@@ -10,6 +10,13 @@ export {
   type IGarageService,
 } from './GarageService';
 export {
+  RentalExtensionService,
+  type ExtendableRentalView,
+  type ExtensionView,
+  type IRentalExtensionService,
+  type RentalExtensionDetail,
+} from './RentalExtensionService';
+export {
   RentalService,
   type AvailableGarageOption,
   type IRentalService,

@@ -5,14 +5,8 @@
  * itu selalu dihitung server, dan kunci yang tidak dikenal dibuang.
  */
 import { z } from 'zod';
-import {
-  GARAGE_TYPE_CODES,
-  PAYMENT_PROOF_MAX_BYTES,
-  RENTAL_TYPE_CODES,
-  VEHICLE_TYPE_CODES,
-  VehicleFactory,
-  detectProofImageType,
-} from '@/domain';
+import { GARAGE_TYPE_CODES, RENTAL_TYPE_CODES, VEHICLE_TYPE_CODES, VehicleFactory } from '@/domain';
+import { paymentProofSchema } from './paymentProofSchema';
 
 /** Pesan untuk kapasitas baterai yang bukan angka positif dengan satu desimal. */
 const PESAN_BATERAI = 'Kapasitas baterai berupa angka positif dengan paling banyak satu desimal';
@@ -100,21 +94,7 @@ export function createRentalSchema(maxDays: number) {
         garageId: z
           .string({ error: 'Pilih garasi yang tersedia' })
           .regex(/^[SCE]\d{3}$/, { error: 'Pilih garasi yang tersedia' }),
-        paymentProof: z
-          .unknown()
-          .superRefine((nilai, ctx) => {
-            if (!(nilai instanceof Uint8Array) || nilai.length === 0) {
-              ctx.addIssue({ code: 'custom', message: 'Bukti pembayaran wajib diunggah' });
-            } else if (nilai.length > PAYMENT_PROOF_MAX_BYTES) {
-              ctx.addIssue({ code: 'custom', message: 'Ukuran bukti pembayaran paling besar 2 MB' });
-            } else if (detectProofImageType(nilai) === null) {
-              ctx.addIssue({
-                code: 'custom',
-                message: 'Bukti pembayaran harus gambar JPEG, PNG, atau WebP',
-              });
-            }
-          })
-          .transform((nilai) => nilai as Uint8Array),
+        paymentProof: paymentProofSchema,
       })
       .refine(
         (data) =>
