@@ -23,13 +23,14 @@ export const metadata: Metadata = { title: 'Perpanjangan Sewa' };
 
 /**
  * Halaman Perpanjangan: daftar garasi yang disewa hari ini (urut menurut ID
- * garasi, tanpa halaman), pilihan satu sewa lewat tautan "Pilih", lalu
- * formulir perpanjangan untuk sewa yang dipilih. Peran Admin diperiksa di
- * halaman ini sendiri.
+ * garasi, tanpa halaman), pilihan satu sewa lewat tautan "Pilih", formulir
+ * perpanjangan untuk sewa yang dipilih, dan riwayat perpanjangannya (tanggal
+ * lama dan baru, tambahan hari, sisa biaya, bukti, Admin, dan waktu). Peran
+ * Admin diperiksa di halaman ini sendiri.
  *
  * @param props.searchParams Parameter alamat; `sewa` adalah Id sewa terpilih (1 sampai 9 angka)
  *   dan `berhasil=1` menampilkan pemberitahuan perpanjangan tersimpan.
- * @returns Pemberitahuan (bila ada), daftar sewa aktif, dan kartu perpanjangan sewa terpilih.
+ * @returns Pemberitahuan (bila ada), daftar sewa aktif, kartu perpanjangan dan riwayat sewa terpilih.
  */
 export default async function ExtensionsPage({
   searchParams,
@@ -183,6 +184,55 @@ export default async function ExtensionsPage({
                 <p className="text-muted-foreground">
                   Sewa ini sudah berakhir dan tidak bisa diperpanjang.
                 </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {detail !== null && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Riwayat Perpanjangan ({detail.extensions.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {detail.extensions.length === 0 ? (
+                <p className="text-muted-foreground">Belum ada perpanjangan untuk sewa ini.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal Selesai Lama</TableHead>
+                      <TableHead>Tanggal Selesai Baru</TableHead>
+                      <TableHead>Tambahan Hari</TableHead>
+                      <TableHead>Sisa Biaya Dibayar</TableHead>
+                      <TableHead>Bukti</TableHead>
+                      <TableHead>Disimpan Oleh</TableHead>
+                      <TableHead>Waktu</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.extensions.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.previousEndDateLabel}</TableCell>
+                        <TableCell>{item.newEndDateLabel}</TableCell>
+                        <TableCell>{item.additionalDays} hari</TableCell>
+                        <TableCell>{formatRupiah(item.amount)}</TableCell>
+                        <TableCell>
+                          <a
+                            href={`/bukti-perpanjangan/${item.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline underline-offset-4"
+                          >
+                            Lihat
+                          </a>
+                        </TableCell>
+                        <TableCell>{item.adminName}</TableCell>
+                        <TableCell>{item.createdAtLabel}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
