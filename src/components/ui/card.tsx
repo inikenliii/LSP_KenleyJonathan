@@ -32,9 +32,18 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * Judul kartu. Secara bawaan berupa `div`; gunakan `as="h1"` (atau `h2`, `h3`)
+ * bila judul ini juga judul halaman agar pembaca layar mendapat struktur judul
+ * yang benar. Tampilannya tidak berubah.
+ */
+function CardTitle({
+  className,
+  as: Elemen = "div",
+  ...props
+}: React.ComponentProps<"div"> & { as?: "div" | "h1" | "h2" | "h3" }) {
   return (
-    <div
+    <Elemen
       data-slot="card-title"
       className={cn(
         "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",

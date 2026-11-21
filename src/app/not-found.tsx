@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 export default function NotFound() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-      <p className="text-lg">Halaman tidak ditemukan.</p>
+      <h1 className="text-lg">Halaman tidak ditemukan.</h1>
       <Button nativeButton={false} render={<Link href="/" />}>
         Kembali ke Beranda
       </Button>

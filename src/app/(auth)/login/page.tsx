@@ -38,7 +38,9 @@ export default async function LoginPage({
     <FadeIn>
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-xl">Masuk</CardTitle>
+          <CardTitle as="h1" className="text-xl">
+            Masuk
+          </CardTitle>
           <CardDescription>Gunakan email dan password yang Anda daftarkan.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

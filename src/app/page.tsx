@@ -29,7 +29,9 @@ export default async function Home() {
       <FadeIn>
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-xl">Aplikasi Penyewaan Garasi</CardTitle>
+            <CardTitle as="h1" className="text-xl">
+              Aplikasi Penyewaan Garasi
+            </CardTitle>
             <CardDescription>
               Garasi Sepeda, Mobil, dan Mobil Listrik dapat disewa secara
               harian atau bulanan.

@@ -24,7 +24,7 @@ export default async function NewRentalPage() {
       <div className="flex flex-col gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Sewa Baru</CardTitle>
+            <CardTitle as="h1">Sewa Baru</CardTitle>
           </CardHeader>
           <CardContent>
             <RentalForm

@@ -31,7 +31,9 @@ export default async function RegisterPage() {
     <FadeIn>
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-xl">Pendaftaran Penyewa</CardTitle>
+          <CardTitle as="h1" className="text-xl">
+            Pendaftaran Penyewa
+          </CardTitle>
           <CardDescription>
             Isi data sesuai KTP. Akun dapat dipakai setelah diverifikasi admin.
           </CardDescription>
