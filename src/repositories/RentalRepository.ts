@@ -135,7 +135,7 @@ export class RentalRepository implements IRentalRepository {
   }
 
   /**
-   * Mengubah baris Prisma menjadi data biasa; kapasitas baterai (Decimal)
+   * Mengubah baris Prisma menjadi data biasa; kapasitas dan sisa baterai (Decimal)
    * dijadikan angka.
    *
    * @param baris Baris sewa beserta tipe garasinya.
@@ -150,6 +150,7 @@ export class RentalRepository implements IRentalRepository {
     vehicleBrand: string;
     vehicleModel: string;
     batteryKwh: { toString(): string } | null;
+    remainingKwh: { toString(): string } | null;
     rentalType: RentalRecord['rentalType'];
     days: number | null;
     startDate: Date;
@@ -172,6 +173,7 @@ export class RentalRepository implements IRentalRepository {
       vehicleBrand: baris.vehicleBrand,
       vehicleModel: baris.vehicleModel,
       batteryKwh: baris.batteryKwh === null ? null : Number(baris.batteryKwh),
+      remainingKwh: baris.remainingKwh === null ? null : Number(baris.remainingKwh),
       rentalType: baris.rentalType,
       days: baris.days,
       startDate: baris.startDate,

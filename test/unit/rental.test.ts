@@ -12,6 +12,7 @@ import {
   detectProofImageType,
   formatTanggal,
   isRentalActive,
+  kwhToCharge,
   maxDailyDays,
   parseIsoDate,
   todayInJakarta,
@@ -104,6 +105,23 @@ describe('format tanggal', () => {
   });
 });
 
+describe('kwhToCharge', () => {
+  it('kapasitas dikurangi sisa', () => {
+    expect(kwhToCharge(60, 20)).toBe(40);
+    expect(kwhToCharge(60, 0)).toBe(60);
+  });
+
+  it('sisa sama dengan kapasitas berarti tidak ada yang diisi', () => {
+    expect(kwhToCharge(60, 60)).toBe(0);
+  });
+
+  it('tidak pernah negatif dan bebas galat pecahan', () => {
+    expect(kwhToCharge(60, 70)).toBe(0);
+    expect(kwhToCharge(60, 20.3)).toBe(39.7);
+    expect(kwhToCharge(0.3, 0.1)).toBe(0.2);
+  });
+});
+
 describe('calculateRentalCost', () => {
   it('harian = hari x harga harian tanpa biaya lain', () => {
     expect(
@@ -113,6 +131,7 @@ describe('calculateRentalCost', () => {
         dailyPrice: 10000,
         chargesBattery: false,
         batteryKwh: null,
+        remainingKwh: null,
         pricePerKwh: null,
       }),
     ).toEqual({ rentalCost: 30000, chargeCost: 0, totalCost: 30000 });
@@ -126,12 +145,13 @@ describe('calculateRentalCost', () => {
         dailyPrice: 50000,
         chargesBattery: false,
         batteryKwh: null,
+        remainingKwh: null,
         pricePerKwh: null,
       }).totalCost,
     ).toBe(1250000);
   });
 
-  it('menambah biaya pengisian penuh untuk mobil listrik di garasi mobil listrik', () => {
+  it('biaya pengisian = (kapasitas - sisa) x harga per kWh: 60, sisa 20, 2500 -> 40 kWh -> 100000', () => {
     expect(
       calculateRentalCost({
         rentalType: 'BULANAN',
@@ -139,9 +159,37 @@ describe('calculateRentalCost', () => {
         dailyPrice: 80000,
         chargesBattery: true,
         batteryKwh: 60,
+        remainingKwh: 20,
         pricePerKwh: 2500,
       }),
-    ).toEqual({ rentalCost: 2000000, chargeCost: 150000, totalCost: 2150000 });
+    ).toEqual({ rentalCost: 2000000, chargeCost: 100000, totalCost: 2100000 });
+  });
+
+  it('sisa sama dengan kapasitas: biaya pengisian 0', () => {
+    const hasil = calculateRentalCost({
+      rentalType: 'BULANAN',
+      days: null,
+      dailyPrice: 80000,
+      chargesBattery: true,
+      batteryKwh: 60,
+      remainingKwh: 60,
+      pricePerKwh: 2500,
+    });
+    expect(hasil).toEqual({ rentalCost: 2000000, chargeCost: 0, totalCost: 2000000 });
+  });
+
+  it('sisa 0: diisi penuh sebesar kapasitas x harga per kWh', () => {
+    const hasil = calculateRentalCost({
+      rentalType: 'BULANAN',
+      days: null,
+      dailyPrice: 80000,
+      chargesBattery: true,
+      batteryKwh: 60,
+      remainingKwh: 0,
+      pricePerKwh: 2500,
+    });
+    expect(hasil.chargeCost).toBe(150000);
+    expect(hasil.totalCost).toBe(2150000);
   });
 
   it('membulatkan biaya pengisian ke rupiah terdekat', () => {
@@ -151,12 +199,21 @@ describe('calculateRentalCost', () => {
       dailyPrice: 1000,
       chargesBattery: true,
     };
-    expect(calculateRentalCost({ ...base, batteryKwh: 75.5, pricePerKwh: 2500 }).chargeCost).toBe(
-      188750,
-    );
-    expect(calculateRentalCost({ ...base, batteryKwh: 33.3, pricePerKwh: 1234 }).chargeCost).toBe(
-      41092,
-    );
+    // 12,5 kWh x 2500 = 31250 (sudah bulat).
+    expect(
+      calculateRentalCost({ ...base, batteryKwh: 20, remainingKwh: 7.5, pricePerKwh: 2500 })
+        .chargeCost,
+    ).toBe(31250);
+    // 33,3 kWh x 1234 = 41092,2 -> 41092.
+    expect(
+      calculateRentalCost({ ...base, batteryKwh: 40, remainingKwh: 6.7, pricePerKwh: 1234 })
+        .chargeCost,
+    ).toBe(41092);
+    // 0,5 kWh x 2505 = 1252,5 -> 1253.
+    expect(
+      calculateRentalCost({ ...base, batteryKwh: 10, remainingKwh: 9.5, pricePerKwh: 2505 })
+        .chargeCost,
+    ).toBe(1253);
   });
 
   it('mengabaikan baterai dan harga kWh bila tidak diisi daya', () => {
@@ -166,6 +223,7 @@ describe('calculateRentalCost', () => {
       dailyPrice: 50000,
       chargesBattery: false,
       batteryKwh: 60,
+      remainingKwh: 20,
       pricePerKwh: 2500,
     });
     expect(hasil).toEqual({ rentalCost: 100000, chargeCost: 0, totalCost: 100000 });
@@ -179,6 +237,7 @@ describe('calculateRentalCost', () => {
         dailyPrice: 10000,
         chargesBattery: false,
         batteryKwh: null,
+        remainingKwh: null,
         pricePerKwh: null,
       }),
     ).toThrow(RangeError);
@@ -189,6 +248,7 @@ describe('calculateRentalCost', () => {
         dailyPrice: 10000,
         chargesBattery: true,
         batteryKwh: 60,
+        remainingKwh: 20,
         pricePerKwh: null,
       }),
     ).toThrow(RangeError);
@@ -199,6 +259,18 @@ describe('calculateRentalCost', () => {
         dailyPrice: 10000,
         chargesBattery: true,
         batteryKwh: null,
+        remainingKwh: 20,
+        pricePerKwh: 2500,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      calculateRentalCost({
+        rentalType: 'BULANAN',
+        days: null,
+        dailyPrice: 10000,
+        chargesBattery: true,
+        batteryKwh: 60,
+        remainingKwh: null,
         pricePerKwh: 2500,
       }),
     ).toThrow(RangeError);

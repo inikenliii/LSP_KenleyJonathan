@@ -146,7 +146,7 @@ describe('RentalService.createRental', () => {
     expect(pilihan.garages.map((g) => g.id)).toEqual(['C001', 'E001', 'S002']);
   });
 
-  it('mobil listrik di garasi mobil listrik bulanan dikenai biaya pengisian penuh', async () => {
+  it('mobil listrik di garasi mobil listrik bulanan dikenai biaya (kapasitas - sisa) x harga per kWh', async () => {
     const today = todayInJakarta();
     await service.createRental(renterA, {
       vehicleType: 'MOBIL_LISTRIK',
@@ -154,6 +154,7 @@ describe('RentalService.createRental', () => {
       vehicleModel: 'Ioniq 5',
       plateNumber: 'b 9 xyz',
       batteryKwh: '60',
+      remainingKwh: '20',
       rentalType: 'BULANAN',
       days: '9',
       garageType: 'ELECTRIC_CAR',
@@ -161,8 +162,10 @@ describe('RentalService.createRental', () => {
       paymentProof: PNG,
     });
     const baris = await prisma.rental.findFirstOrThrow({ where: { garageId: 'E001' } });
-    expect(baris.totalCost).toBe(2150000);
-    expect(baris.chargeCost).toBe(150000);
+    expect(baris.totalCost).toBe(2100000);
+    expect(baris.chargeCost).toBe(100000);
+    expect(Number(baris.batteryKwh)).toBe(60);
+    expect(Number(baris.remainingKwh)).toBe(20);
     expect(baris.pricePerKwh).toBe(2500);
     expect(baris.days).toBeNull();
     expect(baris.plateNumber).toBe('B 9 XYZ');
@@ -176,6 +179,7 @@ describe('RentalService.createRental', () => {
       vehicleModel: 'Air ev',
       plateNumber: 'B 5 ABC',
       batteryKwh: '17,3',
+      remainingKwh: '5,5',
       rentalType: 'HARIAN',
       days: '1',
       garageType: 'CAR',
@@ -186,6 +190,52 @@ describe('RentalService.createRental', () => {
     expect(baris.totalCost).toBe(50000);
     expect(baris.chargeCost).toBe(0);
     expect(baris.pricePerKwh).toBeNull();
+    expect(Number(baris.remainingKwh)).toBe(5.5);
+  });
+
+  it('sisa sama dengan kapasitas: biaya pengisian 0 dan harga per kWh tetap disimpan', async () => {
+    await service.createRental(renterA, {
+      vehicleType: 'MOBIL_LISTRIK',
+      vehicleBrand: 'Hyundai',
+      vehicleModel: 'Ioniq 5',
+      plateNumber: 'B 9 XYZ',
+      batteryKwh: '60',
+      remainingKwh: '60',
+      rentalType: 'HARIAN',
+      days: '2',
+      garageType: 'ELECTRIC_CAR',
+      garageId: 'E001',
+      paymentProof: PNG,
+    });
+    const baris = await prisma.rental.findFirstOrThrow({ where: { garageId: 'E001' } });
+    expect(baris.chargeCost).toBe(0);
+    expect(baris.totalCost).toBe(160000);
+    expect(baris.pricePerKwh).toBe(2500);
+  });
+
+  it('sisa 0 berarti diisi penuh', async () => {
+    await service.createRental(renterA, {
+      vehicleType: 'MOBIL_LISTRIK',
+      vehicleBrand: 'Hyundai',
+      vehicleModel: 'Ioniq 5',
+      plateNumber: 'B 9 XYZ',
+      batteryKwh: '60',
+      remainingKwh: '0',
+      rentalType: 'BULANAN',
+      garageType: 'ELECTRIC_CAR',
+      garageId: 'E001',
+      paymentProof: PNG,
+    });
+    const baris = await prisma.rental.findFirstOrThrow({ where: { garageId: 'E001' } });
+    expect(baris.chargeCost).toBe(150000);
+    expect(baris.totalCost).toBe(2150000);
+  });
+
+  it('sisa baterai pada kendaraan selain mobil listrik diabaikan dan tidak disimpan', async () => {
+    await service.createRental(renterA, isianSepeda({ remainingKwh: '10', batteryKwh: '50' }));
+    const baris = await prisma.rental.findFirstOrThrow({ where: { renterId: renterA } });
+    expect(baris.batteryKwh).toBeNull();
+    expect(baris.remainingKwh).toBeNull();
   });
 
   it('dua penyewa berebut satu garasi: tepat satu berhasil', async () => {
@@ -342,11 +392,56 @@ describe('aturan kendaraan dan garasi', () => {
       isianSepeda({
         vehicleType: 'MOBIL_LISTRIK',
         plateNumber: 'B 1 A',
+        remainingKwh: '10',
         garageType: 'ELECTRIC_CAR',
         garageId: 'E001',
       }),
     );
     expect(galat.fieldErrors.batteryKwh).toBeDefined();
+  });
+
+  it('mobil listrik tanpa sisa baterai ditolak', async () => {
+    const galat = await galatValidasi(
+      isianSepeda({
+        vehicleType: 'MOBIL_LISTRIK',
+        plateNumber: 'B 1 A',
+        batteryKwh: '60',
+        garageType: 'ELECTRIC_CAR',
+        garageId: 'E001',
+      }),
+    );
+    expect(galat.fieldErrors.remainingKwh[0]).toBe('Sisa baterai wajib diisi untuk mobil listrik');
+  });
+
+  it('sisa baterai melebihi kapasitas ditolak di field remainingKwh', async () => {
+    const galat = await galatValidasi(
+      isianSepeda({
+        vehicleType: 'MOBIL_LISTRIK',
+        plateNumber: 'B 1 A',
+        batteryKwh: '60',
+        remainingKwh: '60,1',
+        garageType: 'ELECTRIC_CAR',
+        garageId: 'E001',
+      }),
+    );
+    expect(galat.fieldErrors.remainingKwh[0]).toBe(
+      'Sisa baterai tidak boleh melebihi kapasitas baterai',
+    );
+    expect(await prisma.rental.count()).toBe(0);
+  });
+
+  it.each(['-5', 'abc', '10,55', '1e2'])('sisa baterai "%s" ditolak', async (sisa) => {
+    const galat = await galatValidasi(
+      isianSepeda({
+        vehicleType: 'MOBIL_LISTRIK',
+        plateNumber: 'B 1 A',
+        batteryKwh: '60',
+        remainingKwh: sisa,
+        garageType: 'ELECTRIC_CAR',
+        garageId: 'E001',
+      }),
+    );
+    expect(galat.fieldErrors.remainingKwh).toBeDefined();
   });
 
   it('sewa harian melebihi batas hari bulan ini ditolak', async () => {

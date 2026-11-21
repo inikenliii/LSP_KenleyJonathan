@@ -1,7 +1,7 @@
 /**
  * @file Hierarki kendaraan penyewa. Setiap tipe kendaraan adalah subkelas dari
  * `Vehicle` yang menjawab secara polimorfik tipe garasi mana yang cocok dan
- * data apa yang wajib diisi (plat nomor, kapasitas baterai).
+ * data apa yang wajib diisi (plat nomor, kapasitas dan sisa baterai).
  *
  * Modul ini murni: hanya mengimpor berkas domain lain.
  */
@@ -43,10 +43,10 @@ export abstract class Vehicle {
   }
 
   /**
-   * Apakah kendaraan ini wajib menyebutkan kapasitas baterai. Bawaannya tidak;
-   * Mobil Listrik menimpanya.
+   * Apakah kendaraan ini wajib menyebutkan kapasitas dan sisa baterai.
+   * Bawaannya tidak; Mobil Listrik menimpanya.
    *
-   * @returns `true` bila kapasitas baterai (kWh) wajib diisi.
+   * @returns `true` bila kapasitas dan sisa baterai (kWh) wajib diisi.
    */
   public requiresBattery(): boolean {
     return false;
@@ -64,7 +64,8 @@ export abstract class Vehicle {
 
   /**
    * Apakah penyewaan di garasi bertipe ini dikenai biaya pengisian baterai
-   * penuh. Hanya kendaraan berbaterai di garasi Mobil Listrik yang dikenai.
+   * (sebesar kapasitas dikurangi sisa). Hanya kendaraan berbaterai di garasi
+   * Mobil Listrik yang dikenai.
    *
    * @param garageType Kode tipe garasi yang disewa.
    * @returns `true` bila biaya pengisian harus ditambahkan.
@@ -141,7 +142,7 @@ export class Car extends Vehicle {
   }
 }
 
-/** Mobil listrik: wajib plat dan kapasitas baterai, boleh garasi mobil atau mobil listrik. */
+/** Mobil listrik: wajib plat, kapasitas baterai, dan sisa baterai, boleh garasi mobil atau mobil listrik. */
 export class ElectricCar extends Vehicle {
   /** @inheritdoc */
   public override get type(): VehicleTypeCode {
@@ -161,7 +162,7 @@ export class ElectricCar extends Vehicle {
   }
 
   /**
-   * @returns Selalu `true`: kapasitas baterai wajib diisi.
+   * @returns Selalu `true`: kapasitas dan sisa baterai wajib diisi.
    */
   public override requiresBattery(): boolean {
     return true;

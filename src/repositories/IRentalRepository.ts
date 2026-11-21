@@ -20,6 +20,8 @@ export interface NewRentalData {
   vehicleModel: string;
   /** Kapasitas baterai (kWh); hanya mobil listrik. */
   batteryKwh: number | null;
+  /** Sisa baterai (kWh) saat disewa; hanya mobil listrik. */
+  remainingKwh: number | null;
   /** Tipe sewa. */
   rentalType: RentalTypeCode;
   /** Jumlah hari; hanya sewa harian. */
@@ -30,7 +32,7 @@ export interface NewRentalData {
   endDate: Date;
   /** Salinan harga harian saat sewa dibuat. */
   dailyPrice: number;
-  /** Salinan harga per kWh; hanya bila baterai diisi penuh. */
+  /** Salinan harga per kWh; hanya bila baterai diisi. */
   pricePerKwh: number | null;
   /** Biaya pengisian baterai (0 bila tidak ada). */
   chargeCost: number;

@@ -71,6 +71,8 @@ export interface RentalView {
   plateNumber: string | null;
   /** Kapasitas baterai (kWh); hanya mobil listrik. */
   batteryKwh: number | null;
+  /** Sisa baterai (kWh) saat disewa; hanya mobil listrik. */
+  remainingKwh: number | null;
   /** Nama tipe sewa ("Harian" atau "Bulanan"). */
   rentalTypeLabel: string;
   /** Jumlah hari; hanya sewa harian. */
@@ -244,6 +246,7 @@ export class RentalService implements IRentalService {
         dailyPrice: garage.dailyPrice,
         chargesBattery,
         batteryKwh: data.batteryKwh ?? null,
+        remainingKwh: data.remainingKwh ?? null,
         pricePerKwh: garage.pricePerKwh,
       });
 
@@ -256,6 +259,7 @@ export class RentalService implements IRentalService {
         vehicleBrand: data.vehicleBrand,
         vehicleModel: data.vehicleModel,
         batteryKwh: vehicle.requiresBattery() ? (data.batteryKwh ?? null) : null,
+        remainingKwh: vehicle.requiresBattery() ? (data.remainingKwh ?? null) : null,
         rentalType: data.rentalType,
         days: data.rentalType === 'HARIAN' ? (data.days ?? null) : null,
         startDate: today,
@@ -335,6 +339,7 @@ export class RentalService implements IRentalService {
       vehicleModel: row.vehicleModel,
       plateNumber: row.plateNumber,
       batteryKwh: row.batteryKwh,
+      remainingKwh: row.remainingKwh,
       rentalTypeLabel: RENTAL_TYPE_LABELS[row.rentalType],
       days: row.days,
       startDate: toIsoDate(row.startDate),

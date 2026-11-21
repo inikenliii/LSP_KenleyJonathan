@@ -131,12 +131,13 @@ model Rental {
   vehicleBrand     String            @map("vehicle_brand") @db.VarChar(50)
   vehicleModel     String            @map("vehicle_model") @db.VarChar(50)
   batteryKwh       Decimal?          @map("battery_kwh") @db.Decimal(5, 1) // hanya mobil listrik
+  remainingKwh     Decimal?          @map("remaining_kwh") @db.Decimal(5, 1) // sisa baterai saat disewa, hanya mobil listrik
   rentalType       RentalType        @map("rental_type")
   days             Int? // hanya sewa harian
   startDate        DateTime          @map("start_date") @db.Date
   endDate          DateTime          @map("end_date") @db.Date
   dailyPrice       Int               @map("daily_price") // salinan harga harian tipe garasi
-  pricePerKwh      Int?              @map("price_per_kwh") // salinan harga per kWh, hanya bila baterai diisi penuh
+  pricePerKwh      Int?              @map("price_per_kwh") // salinan harga per kWh, hanya bila baterai diisi
   chargeCost       Int               @default(0) @map("charge_cost")
   totalCost        Int               @map("total_cost") // rupiah utuh
   paymentProofFile String            @map("payment_proof_file") @db.VarChar(64) // nama file saja

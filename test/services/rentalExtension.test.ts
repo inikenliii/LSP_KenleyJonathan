@@ -289,6 +289,7 @@ describe('RentalExtensionService.extendRental', () => {
       vehicleModel: 'Ioniq 5',
       plateNumber: 'B 9 XYZ',
       batteryKwh: '60',
+      remainingKwh: '20',
       rentalType: 'BULANAN',
       garageType: 'ELECTRIC_CAR',
       garageId: 'E001',

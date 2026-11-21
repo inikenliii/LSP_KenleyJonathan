@@ -31,6 +31,7 @@ export async function createRentalAction(
     'vehicleBrand',
     'vehicleModel',
     'batteryKwh',
+    'remainingKwh',
     'rentalType',
     'days',
     'garageType',

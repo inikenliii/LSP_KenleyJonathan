@@ -23,6 +23,7 @@ import {
   computeEndDate,
   formatRupiah,
   formatTanggal,
+  kwhToCharge,
   parseIsoDate,
   type GarageTypeCode,
   type RentalCostBreakdown,
@@ -39,8 +40,35 @@ const KELAS_PILIHAN =
 /** Pesan bila berkas bukti melebihi batas ukuran. */
 const PESAN_UKURAN = 'Ukuran bukti pembayaran paling besar 2 MB';
 
-/** Pola kapasitas baterai: angka positif dengan paling banyak satu desimal. */
+/** Pola kapasitas dan sisa baterai: angka dengan paling banyak satu desimal. */
 const POLA_BATERAI = /^\d{1,3}([.,]\d)?$/;
+
+/**
+ * Membaca isian kWh menjadi angka.
+ *
+ * @param teks Isian kapasitas atau sisa baterai.
+ * @returns Angkanya, atau `null` bila belum sesuai pola (koma boleh sebagai desimal).
+ */
+function parseKwh(teks: string): number | null {
+  const bersih = teks.trim();
+  return POLA_BATERAI.test(bersih) ? Number(bersih.replace(',', '.')) : null;
+}
+
+/**
+ * Menghitung kWh yang diisi dari isian kapasitas dan sisa baterai.
+ *
+ * @param batteryKwh Isian kapasitas baterai (teks).
+ * @param remainingKwh Isian sisa baterai (teks).
+ * @returns kWh yang diisi, atau `null` bila isian belum sah atau sisa melebihi kapasitas.
+ */
+function previewKwhToCharge(batteryKwh: string, remainingKwh: string): number | null {
+  const kapasitas = parseKwh(batteryKwh);
+  const sisa = parseKwh(remainingKwh);
+  if (kapasitas === null || kapasitas <= 0 || sisa === null || sisa > kapasitas) {
+    return null;
+  }
+  return kwhToCharge(kapasitas, sisa);
+}
 
 /**
  * Menghitung tanggal berakhir untuk pratinjau dengan fungsi domain yang sama
@@ -70,6 +98,7 @@ function previewEndDate(today: string, rentalType: RentalTypeCode, days: string)
  * @param input.rentalType Tipe sewa.
  * @param input.days Isian jumlah hari (teks).
  * @param input.batteryKwh Isian kapasitas baterai (teks).
+ * @param input.remainingKwh Isian sisa baterai (teks).
  * @param input.garage Garasi yang dipilih, atau `undefined` bila belum ada.
  * @returns Rincian biaya, atau `null` bila isian belum lengkap atau belum sah.
  */
@@ -78,6 +107,7 @@ function previewCost(input: {
   rentalType: RentalTypeCode;
   days: string;
   batteryKwh: string;
+  remainingKwh: string;
   garage: AvailableGarageOption | undefined;
 }): RentalCostBreakdown | null {
   const { garage } = input;
@@ -85,16 +115,17 @@ function previewCost(input: {
     return null;
   }
   const chargesBattery = VehicleFactory.create(input.vehicleType).chargesBatteryIn(garage.type);
-  const baterai = POLA_BATERAI.test(input.batteryKwh.trim())
-    ? Number(input.batteryKwh.trim().replace(',', '.'))
-    : null;
+  const kapasitas = parseKwh(input.batteryKwh);
+  const sisa = parseKwh(input.remainingKwh);
+  const sisaSah = kapasitas !== null && sisa !== null && sisa <= kapasitas;
   try {
     return calculateRentalCost({
       rentalType: input.rentalType,
       days: input.days.trim() === '' ? null : Number(input.days),
       dailyPrice: garage.dailyPrice,
       chargesBattery,
-      batteryKwh: baterai !== null && baterai > 0 ? baterai : null,
+      batteryKwh: kapasitas !== null && kapasitas > 0 ? kapasitas : null,
+      remainingKwh: sisaSah ? sisa : null,
       pricePerKwh: garage.pricePerKwh,
     });
   } catch {
@@ -137,14 +168,23 @@ export function RentalForm({
   );
   const [garageId, setGarageId] = useState('');
   const [batteryKwh, setBatteryKwh] = useState('');
+  const [remainingKwh, setRemainingKwh] = useState('');
   const [fileError, setFileError] = useState<string | null>(null);
 
   const vehicle = VehicleFactory.create(vehicleType);
   const garageOptions = garages.filter((garasi) => garasi.type === garageType);
   const selectedGarage = garageOptions.find((garasi) => garasi.id === garageId);
   const endDateLabel = previewEndDate(today, rentalType, days);
-  const cost = previewCost({ vehicleType, rentalType, days, batteryKwh, garage: selectedGarage });
+  const cost = previewCost({
+    vehicleType,
+    rentalType,
+    days,
+    batteryKwh,
+    remainingKwh,
+    garage: selectedGarage,
+  });
   const showCharge = selectedGarage !== undefined && vehicle.chargesBatteryIn(selectedGarage.type);
+  const kwhDiisi = previewKwhToCharge(batteryKwh, remainingKwh);
 
   /**
    * Mengganti tipe kendaraan: tipe garasi dikembalikan ke pilihan pertama yang
@@ -267,6 +307,28 @@ export function RentalForm({
           </Field>
         )}
 
+        {vehicle.requiresBattery() && (
+          <Field data-invalid={galat.remainingKwh?.[0] ? true : undefined}>
+            <FieldLabel htmlFor="remainingKwh">Sisa Baterai (kWh)</FieldLabel>
+            <Input
+              id="remainingKwh"
+              name="remainingKwh"
+              inputMode="decimal"
+              autoComplete="off"
+              value={remainingKwh}
+              onChange={(event) => setRemainingKwh(event.target.value)}
+              aria-invalid={galat.remainingKwh?.[0] ? true : undefined}
+            />
+            {galat.remainingKwh?.[0] ? (
+              <FieldError>{galat.remainingKwh[0]}</FieldError>
+            ) : (
+              <FieldDescription>
+                Nol atau lebih, paling banyak satu desimal, tidak melebihi kapasitas.
+              </FieldDescription>
+            )}
+          </Field>
+        )}
+
         <Field data-invalid={galat.rentalType?.[0] ? true : undefined}>
           <FieldLabel htmlFor="rentalType">Tipe Sewa</FieldLabel>
           <select
@@ -374,9 +436,15 @@ export function RentalForm({
                 <dt>Biaya sewa</dt>
                 <dd>{formatRupiah(cost.rentalCost)}</dd>
               </div>
+              {showCharge && kwhDiisi !== null && (
+                <div className="flex justify-between gap-4">
+                  <dt>kWh yang diisi</dt>
+                  <dd>{kwhDiisi} kWh</dd>
+                </div>
+              )}
               {showCharge && (
                 <div className="flex justify-between gap-4">
-                  <dt>Biaya isi listrik penuh</dt>
+                  <dt>Biaya isi listrik</dt>
                   <dd>{formatRupiah(cost.chargeCost)}</dd>
                 </div>
               )}

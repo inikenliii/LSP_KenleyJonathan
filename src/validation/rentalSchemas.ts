@@ -11,11 +11,14 @@ import { paymentProofSchema } from './paymentProofSchema';
 /** Pesan untuk kapasitas baterai yang bukan angka positif dengan satu desimal. */
 const PESAN_BATERAI = 'Kapasitas baterai berupa angka positif dengan paling banyak satu desimal';
 
+/** Pesan untuk sisa baterai yang bukan angka nol atau lebih dengan satu desimal. */
+const PESAN_SISA = 'Sisa baterai berupa angka nol atau lebih dengan paling banyak satu desimal';
+
 /**
  * Merapikan isian formulir sebelum divalidasi: teks dipangkas, isian kosong
  * dianggap tidak diisi, plat dijadikan huruf besar tanpa spasi ganda, koma
- * desimal baterai diganti titik, dan isian yang tidak berlaku untuk tipe
- * kendaraan atau tipe sewa dibuang.
+ * desimal kapasitas dan sisa baterai diganti titik, dan isian yang tidak
+ * berlaku untuk tipe kendaraan atau tipe sewa dibuang.
  *
  * @param body Isi formulir mentah.
  * @returns Isian yang sudah dirapikan.
@@ -41,11 +44,15 @@ function normalizeRentalInput(body: unknown): unknown {
   if (typeof input.batteryKwh === 'string') {
     input.batteryKwh = input.batteryKwh.replace(',', '.');
   }
+  if (typeof input.remainingKwh === 'string') {
+    input.remainingKwh = input.remainingKwh.replace(',', '.');
+  }
   if (input.vehicleType === 'SEPEDA') {
     input.plateNumber = undefined;
   }
   if (input.vehicleType !== 'MOBIL_LISTRIK') {
     input.batteryKwh = undefined;
+    input.remainingKwh = undefined;
   }
   if (input.rentalType !== 'HARIAN') {
     input.days = undefined;
@@ -83,6 +90,11 @@ export function createRentalSchema(maxDays: number) {
           .transform(Number)
           .refine((nilai) => nilai > 0, { error: PESAN_BATERAI })
           .optional(),
+        remainingKwh: z
+          .string({ error: PESAN_SISA })
+          .regex(/^\d{1,3}(\.\d)?$/, { error: PESAN_SISA })
+          .transform(Number)
+          .optional(),
         rentalType: z.enum(RENTAL_TYPE_CODES, { error: 'Pilih tipe sewa' }),
         days: z.coerce
           .number({ error: 'Jumlah hari wajib diisi angka' })
@@ -111,6 +123,25 @@ export function createRentalSchema(maxDays: number) {
         {
           path: ['batteryKwh'],
           error: 'Kapasitas baterai wajib diisi untuk mobil listrik',
+        },
+      )
+      .refine(
+        (data) =>
+          data.remainingKwh !== undefined ||
+          !VehicleFactory.create(data.vehicleType).requiresBattery(),
+        {
+          path: ['remainingKwh'],
+          error: 'Sisa baterai wajib diisi untuk mobil listrik',
+        },
+      )
+      .refine(
+        (data) =>
+          data.remainingKwh === undefined ||
+          data.batteryKwh === undefined ||
+          data.remainingKwh <= data.batteryKwh,
+        {
+          path: ['remainingKwh'],
+          error: 'Sisa baterai tidak boleh melebihi kapasitas baterai',
         },
       )
       .refine((data) => data.rentalType !== 'HARIAN' || data.days !== undefined, {

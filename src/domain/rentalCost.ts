@@ -3,8 +3,9 @@
  * di formulir dan untuk nilai yang disimpan server.
  *
  * Aturan biaya hanya: harian = hari x harga harian, bulanan = 25 x harga
- * harian, ditambah biaya pengisian baterai penuh untuk mobil listrik di garasi
- * mobil listrik. Tidak ada biaya tambahan atau diskon lain.
+ * harian, ditambah biaya pengisian baterai untuk mobil listrik di garasi mobil
+ * listrik. Biaya pengisian = (kapasitas - sisa baterai) x harga per kWh.
+ * Tidak ada biaya tambahan atau diskon lain.
  */
 import { monthlyPrice } from './pricing';
 import type { RentalTypeCode } from './rentalPeriod';
@@ -21,6 +22,8 @@ export interface RentalCostInput {
   chargesBattery: boolean;
   /** Kapasitas baterai dalam kWh (wajib bila `chargesBattery`). */
   batteryKwh: number | null;
+  /** Sisa baterai dalam kWh saat disewa (wajib bila `chargesBattery`). */
+  remainingKwh: number | null;
   /** Harga per kWh dalam rupiah (wajib bila `chargesBattery`). */
   pricePerKwh: number | null;
 }
@@ -29,10 +32,26 @@ export interface RentalCostInput {
 export interface RentalCostBreakdown {
   /** Biaya sewa garasi. */
   rentalCost: number;
-  /** Biaya pengisian baterai penuh (0 bila tidak dikenakan). */
+  /** Biaya pengisian baterai sebesar kWh yang diisi (0 bila tidak dikenakan). */
   chargeCost: number;
   /** Total yang dibayar: `rentalCost + chargeCost`. */
   totalCost: number;
+}
+
+/**
+ * Menghitung kWh yang harus diisi: kapasitas dikurangi sisa baterai. Hasil
+ * dibulatkan ke satu desimal agar bebas galat pecahan dan tidak pernah negatif.
+ *
+ * @param capacityKwh Kapasitas baterai dalam kWh.
+ * @param remainingKwh Sisa baterai dalam kWh.
+ * @returns kWh yang diisi, paling kecil 0.
+ * @example
+ * kwhToCharge(60, 20); // 40
+ * kwhToCharge(60, 70); // 0
+ */
+export function kwhToCharge(capacityKwh: number, remainingKwh: number): number {
+  const selisih = Math.round((capacityKwh - remainingKwh) * 10) / 10;
+  return Math.max(0, selisih);
 }
 
 /**
@@ -43,8 +62,8 @@ export interface RentalCostBreakdown {
  * @throws {RangeError} Bila data yang dibutuhkan tidak lengkap.
  * @example
  * calculateRentalCost({ rentalType: 'BULANAN', days: null, dailyPrice: 80000,
- *   chargesBattery: true, batteryKwh: 60, pricePerKwh: 2500 });
- * // { rentalCost: 2000000, chargeCost: 150000, totalCost: 2150000 }
+ *   chargesBattery: true, batteryKwh: 60, remainingKwh: 20, pricePerKwh: 2500 });
+ * // { rentalCost: 2000000, chargeCost: 100000, totalCost: 2100000 }
  */
 export function calculateRentalCost(input: RentalCostInput): RentalCostBreakdown {
   let rentalCost: number;
@@ -59,10 +78,12 @@ export function calculateRentalCost(input: RentalCostInput): RentalCostBreakdown
 
   let chargeCost = 0;
   if (input.chargesBattery) {
-    if (input.batteryKwh === null || input.pricePerKwh === null) {
-      throw new RangeError('Biaya pengisian membutuhkan kapasitas baterai dan harga per kWh.');
+    if (input.batteryKwh === null || input.remainingKwh === null || input.pricePerKwh === null) {
+      throw new RangeError(
+        'Biaya pengisian membutuhkan kapasitas baterai, sisa baterai, dan harga per kWh.',
+      );
     }
-    chargeCost = Math.round(input.batteryKwh * input.pricePerKwh);
+    chargeCost = Math.round(kwhToCharge(input.batteryKwh, input.remainingKwh) * input.pricePerKwh);
   }
 
   return { rentalCost, chargeCost, totalCost: rentalCost + chargeCost };

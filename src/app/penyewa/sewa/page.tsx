@@ -88,6 +88,7 @@ export default async function MyRentalsPage({
                           {item.vehicleBrand} {item.vehicleModel}
                           {item.plateNumber !== null && ` - ${item.plateNumber}`}
                           {item.batteryKwh !== null && ` - ${item.batteryKwh} kWh`}
+                          {item.remainingKwh !== null && ` (sisa ${item.remainingKwh} kWh)`}
                         </span>
                       </TableCell>
                       <TableCell>
