@@ -110,4 +110,41 @@ export class UserRepository implements IUserRepository {
     });
     return row === null ? null : UserRepository.toDomain(row);
   }
+
+  /**
+   * Mengambil penyewa yang menunggu verifikasi.
+   *
+   * @returns Penyewa berstatus PENDING, terlama dulu (tanggal daftar lalu id).
+   */
+  async findPendingRenters(): Promise<User[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { role: 'RENTER', verificationStatus: 'PENDING' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: UserRepository.PUBLIC_SELECT,
+    });
+    return rows.map((row) => UserRepository.toDomain(row));
+  }
+
+  /**
+   * Menyimpan keputusan verifikasi dalam satu pembaruan bersyarat: hanya
+   * penyewa yang masih PENDING yang berubah.
+   *
+   * @param id Id penyewa.
+   * @param change Status baru dan id admin yang memutuskan.
+   * @returns Jumlah baris yang berubah (1 bila berhasil, 0 bila sudah diproses atau tidak ada).
+   */
+  async decideVerification(
+    id: number,
+    change: { status: 'ACCEPTED' | 'REJECTED'; verifiedById: number },
+  ): Promise<number> {
+    const hasil = await this.prisma.user.updateMany({
+      where: { id, role: 'RENTER', verificationStatus: 'PENDING' },
+      data: {
+        verificationStatus: change.status,
+        verifiedAt: new Date(),
+        verifiedById: change.verifiedById,
+      },
+    });
+    return hasil.count;
+  }
 }

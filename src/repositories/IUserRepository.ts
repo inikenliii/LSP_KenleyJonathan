@@ -63,4 +63,24 @@ export interface IUserRepository {
    * @returns Pengguna, atau `null` bila tidak ada.
    */
   findById(id: number): Promise<User | null>;
+
+  /**
+   * Mengambil penyewa yang menunggu verifikasi.
+   *
+   * @returns Penyewa berstatus PENDING, terlama dulu (tanggal daftar lalu id).
+   */
+  findPendingRenters(): Promise<User[]>;
+
+  /**
+   * Menyimpan keputusan verifikasi. Perubahan hanya terjadi bila akun masih
+   * penyewa berstatus PENDING sehingga klik ganda atau dua admin sekaligus aman.
+   *
+   * @param id Id penyewa.
+   * @param change Status baru dan id admin yang memutuskan.
+   * @returns Jumlah baris yang berubah: 1 bila berhasil, 0 bila sudah diproses atau tidak ada.
+   */
+  decideVerification(
+    id: number,
+    change: { status: 'ACCEPTED' | 'REJECTED'; verifiedById: number },
+  ): Promise<number>;
 }

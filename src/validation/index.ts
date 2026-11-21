@@ -3,3 +3,4 @@
  */
 export * from './authSchemas';
 export * from './parse';
+export * from './verificationSchemas';
