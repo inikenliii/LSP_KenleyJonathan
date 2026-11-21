@@ -61,7 +61,7 @@ export interface IReportService {
    * @throws {ValidationError} Bila tahun bukan bilangan bulat 2000 sampai 2100.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
    */
-  getMonthlyReport(input: { year?: string }): Promise<MonthlyReportView>;
+  getMonthlyReport(input: { year?: unknown }): Promise<MonthlyReportView>;
 
   /**
    * Laporan per hari pada satu bulan.
@@ -71,7 +71,7 @@ export interface IReportService {
    * @throws {ValidationError} Bila tahun atau bulan tidak sah.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
    */
-  getDailyReport(input: { year?: string; month?: string }): Promise<DailyReportView>;
+  getDailyReport(input: { year?: unknown; month?: unknown }): Promise<DailyReportView>;
 
   /**
    * Laporan per tipe garasi sepanjang waktu.
@@ -93,12 +93,12 @@ export interface IReportService {
 /**
  * Mengubah isian kosong atau spasi saja menjadi tidak diisi agar memakai nilai bawaan.
  *
- * @param nilai Isian dari alamat.
+ * @param nilai Isian dari alamat; selain teks (kosong atau parameter berulang) dianggap tidak diisi.
  * @param bawaan Nilai bawaan.
- * @returns Isian yang dipangkas, atau nilai bawaan bila kosong.
+ * @returns Isian yang dipangkas, atau nilai bawaan bila kosong atau bukan teks.
  */
-function atauBawaan(nilai: string | undefined, bawaan: number): string {
-  const teks = nilai?.trim() ?? '';
+export function atauBawaan(nilai: unknown, bawaan: number): string {
+  const teks = typeof nilai === 'string' ? nilai.trim() : '';
   return teks === '' ? String(bawaan) : teks;
 }
 
@@ -131,7 +131,7 @@ export class ReportService implements IReportService {
    * @throws {ValidationError} Bila tahun bukan bilangan bulat 2000 sampai 2100.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
    */
-  async getMonthlyReport(input: { year?: string }): Promise<MonthlyReportView> {
+  async getMonthlyReport(input: { year?: unknown }): Promise<MonthlyReportView> {
     const { year } = parseInput(reportYearSchema, {
       year: atauBawaan(input.year, this.currentPeriod().year),
     });
@@ -151,7 +151,7 @@ export class ReportService implements IReportService {
    * @throws {ValidationError} Bila tahun atau bulan tidak sah.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
    */
-  async getDailyReport(input: { year?: string; month?: string }): Promise<DailyReportView> {
+  async getDailyReport(input: { year?: unknown; month?: unknown }): Promise<DailyReportView> {
     const sekarang = this.currentPeriod();
     const { year, month } = parseInput(reportMonthSchema, {
       year: atauBawaan(input.year, sekarang.year),

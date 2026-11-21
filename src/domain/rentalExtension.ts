@@ -14,6 +14,24 @@
 /** Jumlah milidetik dalam satu hari. */
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/** Nilai terbesar kolom INTEGER PostgreSQL; batas atas tambahan hari dan sisa biaya. */
+export const MAX_EXTENSION_VALUE = 2_147_483_647;
+
+/** Pesan bila tanggal selesai baru membuat tambahan hari atau sisa biaya melewati batas kolom. */
+export const EXTENSION_TOO_FAR_MESSAGE = 'Tanggal selesai baru terlalu jauh';
+
+/**
+ * Dilempar bila tambahan hari atau sisa biaya melewati {@link MAX_EXTENSION_VALUE}
+ * sehingga tidak muat di kolom INTEGER database.
+ */
+export class ExtensionTooFarError extends RangeError {
+  /** Membuat error dengan pesan baku {@link EXTENSION_TOO_FAR_MESSAGE}. */
+  constructor() {
+    super(EXTENSION_TOO_FAR_MESSAGE);
+    this.name = 'ExtensionTooFarError';
+  }
+}
+
 /** Masukan perhitungan sisa biaya perpanjangan. */
 export interface ExtensionCostInput {
   /** Tanggal selesai sewa saat ini (tanggal-saja). */
@@ -53,6 +71,8 @@ export function countAdditionalDays(currentEndDate: Date, newEndDate: Date): num
  * @returns Tambahan hari dan sisa biaya dalam rupiah bulat.
  * @throws {RangeError} Bila tanggal baru tidak setelah tanggal selesai saat ini, atau
  *   harga harian bukan bilangan bulat tidak negatif.
+ * @throws {ExtensionTooFarError} (turunan `RangeError`) Bila tambahan hari atau sisa biaya
+ *   melebihi 2.147.483.647, batas kolom INTEGER database.
  * @example
  * // Sewa bulanan, harga harian 80000, diperpanjang 31 hari (bukan 25 x harga harian).
  * calculateExtensionCost({ currentEndDate: parseIsoDate('2026-12-21'),
@@ -67,5 +87,9 @@ export function calculateExtensionCost(input: ExtensionCostInput): ExtensionCost
   if (!Number.isSafeInteger(input.dailyPrice) || input.dailyPrice < 0) {
     throw new RangeError('Harga harian harus bilangan bulat tidak negatif.');
   }
-  return { additionalDays, amount: additionalDays * input.dailyPrice };
+  const amount = additionalDays * input.dailyPrice;
+  if (additionalDays > MAX_EXTENSION_VALUE || amount > MAX_EXTENSION_VALUE) {
+    throw new ExtensionTooFarError();
+  }
+  return { additionalDays, amount };
 }

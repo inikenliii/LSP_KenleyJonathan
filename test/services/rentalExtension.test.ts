@@ -348,6 +348,12 @@ describe('RentalExtensionService.extendRental', () => {
     await pastikanTidakBerubah();
   });
 
+  it('menolak tanggal yang terlalu jauh dengan pesan di kolom tanggal, tanpa menyimpan apa pun', async () => {
+    const galat = await galatValidasi(isianPerpanjangan('9999-12-31'));
+    expect(galat.fieldErrors.newEndDate).toEqual(['Tanggal selesai baru terlalu jauh']);
+    await pastikanTidakBerubah();
+  });
+
   it('menolak tanggal yang tidak ada di kalender atau salah format', async () => {
     for (const tanggal of ['2026-02-30', '30-11-2026']) {
       const galat = await galatValidasi(isianPerpanjangan(tanggal));

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ValidationError, parseIsoDate, type ReportDateRange, type ReportRental } from '@/domain';
 import { GarageRepository, ReportRepository, type IReportRepository } from '@/repositories';
 import { GarageService, ReportService } from '@/services';
+import { atauBawaan } from '@/services/ReportService';
 import { createTestPrisma, resetDatabase } from '../support/db';
 import { insertUser } from '../support/users';
 
@@ -235,6 +236,27 @@ describe('ReportService, isian tidak sah', () => {
     expect(galat).toBeInstanceOf(ValidationError);
     expect((galat as ValidationError).fieldErrors.month).toEqual(['Bulan harus bilangan bulat 1 sampai 12']);
     expect(panggilan).toHaveLength(0);
+  });
+});
+
+describe('parameter alamat berulang atau kosong', () => {
+  it('atauBawaan memakai nilai bawaan untuk larik, undefined, dan teks kosong tanpa error', () => {
+    expect(atauBawaan(['2026', '2027'], 2025)).toBe('2025');
+    expect(atauBawaan(undefined, 2025)).toBe('2025');
+    expect(atauBawaan('   ', 2025)).toBe('2025');
+    expect(atauBawaan(' 2027 ', 2025)).toBe('2027');
+  });
+
+  it('laporan bulanan dan harian tidak error bila tahun atau bulan berupa larik', async () => {
+    const palsu = new ReportService(
+      { findRentals: async (): Promise<ReportRental[]> => [] },
+      () => new Date('2026-11-21T03:00:00Z'),
+    );
+    const bulanan = await palsu.getMonthlyReport({ year: ['2026', '2027'] });
+    expect(bulanan.year).toBe(2026);
+    const harian = await palsu.getDailyReport({ year: ['2026', '2027'], month: ['3', '4'] });
+    expect(harian.year).toBe(2026);
+    expect(harian.month).toBe(11);
   });
 });
 

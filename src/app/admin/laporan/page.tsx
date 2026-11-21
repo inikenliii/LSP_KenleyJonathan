@@ -33,22 +33,40 @@ const KELAS_PILIHAN =
 /** Teks pengganti tabel bila isian tahun atau bulan tidak sah. */
 const PESAN_PERBAIKI = 'Perbaiki isian di atas untuk menampilkan laporan.';
 
+/** Nilai satu parameter alamat; parameter yang diulang (`?a=1&a=2`) tiba sebagai larik. */
+type ParameterAlamat = string | string[] | undefined;
+
+/**
+ * Mengambil nilai pertama dari parameter alamat. Bila parameter diulang, hanya
+ * yang pertama dipakai agar halaman tidak error.
+ *
+ * @param nilai Parameter alamat mentah.
+ * @returns Teks pertama, atau `undefined` bila tidak diisi.
+ */
+function nilaiPertama(nilai: ParameterAlamat): string | undefined {
+  return Array.isArray(nilai) ? nilai[0] : nilai;
+}
+
 /**
  * Halaman Laporan: satu halaman dengan empat tampilan (per bulan, per hari,
  * per tipe garasi, per penyewa) yang dipilih lewat tautan. Tahun dan bulan
  * dipilih lewat formulir GET biasa; isian yang tidak sah memunculkan pesan
  * di samping kolom dan tidak menjalankan kueri.
  *
- * @param props.searchParams Parameter alamat `jenis` (bulan, hari, tipe, penyewa), `tahun`, dan `bulan`.
+ * @param props.searchParams Parameter alamat `jenis` (bulan, hari, tipe, penyewa), `tahun`, dan `bulan`;
+ *   bila ada yang diulang, nilai pertamanya yang dipakai.
  * @returns Judul, pilihan tampilan, formulir periode (bila perlu), dan tabel laporan.
  */
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jenis?: string; tahun?: string; bulan?: string }>;
+  searchParams: Promise<{ jenis?: ParameterAlamat; tahun?: ParameterAlamat; bulan?: ParameterAlamat }>;
 }) {
   await requireRole('ADMIN');
-  const { jenis: jenisMentah, tahun, bulan } = await searchParams;
+  const parameter = await searchParams;
+  const jenisMentah = nilaiPertama(parameter.jenis);
+  const tahun = nilaiPertama(parameter.tahun);
+  const bulan = nilaiPertama(parameter.bulan);
   const jenis = TAMPILAN.find((tampilan) => tampilan.jenis === jenisMentah)?.jenis ?? 'bulan';
   const periode = reportService.currentPeriod();
 

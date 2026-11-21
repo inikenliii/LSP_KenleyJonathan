@@ -5,6 +5,8 @@
  */
 import {
   ConflictError,
+  EXTENSION_TOO_FAR_MESSAGE,
+  ExtensionTooFarError,
   GarageFactory,
   NotFoundError,
   PROOF_CONTENT_TYPES,
@@ -21,6 +23,7 @@ import {
   toAppError,
   toIsoDate,
   todayInJakarta,
+  type ExtensionCostBreakdown,
   type ProofImageType,
 } from '@/domain';
 import type { IPaymentProofStorage } from '@/lib/payment-proof-storage';
@@ -129,7 +132,8 @@ export interface IRentalExtensionService {
    * @param adminId Id Admin dari sesi (bukan dari formulir).
    * @param input Isian formulir mentah, termasuk byte bukti pembayaran.
    * @returns Perpanjangan yang tersimpan.
-   * @throws {ValidationError} Bila isian tidak sah atau tanggal baru tidak setelah tanggal berakhir saat ini.
+   * @throws {ValidationError} Bila isian tidak sah, tanggal baru tidak setelah tanggal berakhir
+   *   saat ini, atau tanggal baru terlalu jauh sehingga tambahan hari atau sisa biaya melewati batas database.
    * @throws {NotFoundError} Bila sewa tidak ada.
    * @throws {ConflictError} Bila sewa sudah berakhir atau berubah saat disimpan.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
@@ -212,7 +216,8 @@ export class RentalExtensionService implements IRentalExtensionService {
    * @param adminId Id Admin dari sesi.
    * @param input Isian formulir mentah.
    * @returns Perpanjangan yang tersimpan.
-   * @throws {ValidationError} Bila isian tidak sah atau tanggal baru tidak setelah tanggal berakhir saat ini.
+   * @throws {ValidationError} Bila isian tidak sah, tanggal baru tidak setelah tanggal berakhir
+   *   saat ini, atau tanggal baru terlalu jauh sehingga tambahan hari atau sisa biaya melewati batas database.
    * @throws {NotFoundError} Bila sewa tidak ada.
    * @throws {ConflictError} Bila sewa sudah berakhir atau berubah saat disimpan.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
@@ -236,11 +241,19 @@ export class RentalExtensionService implements IRentalExtensionService {
           newEndDate: ['Tanggal selesai baru harus setelah tanggal selesai saat ini'],
         });
       }
-      const biaya = calculateExtensionCost({
-        currentEndDate: sewa.endDate,
-        newEndDate: data.newEndDate,
-        dailyPrice: sewa.dailyPrice,
-      });
+      let biaya: ExtensionCostBreakdown;
+      try {
+        biaya = calculateExtensionCost({
+          currentEndDate: sewa.endDate,
+          newEndDate: data.newEndDate,
+          dailyPrice: sewa.dailyPrice,
+        });
+      } catch (error) {
+        if (error instanceof ExtensionTooFarError) {
+          throw new ValidationError({ newEndDate: [EXTENSION_TOO_FAR_MESSAGE] });
+        }
+        throw error;
+      }
 
       berkas = await this.proofs.save(data.paymentProof, proofType);
       const tersimpan = await this.extensions.createExtension(

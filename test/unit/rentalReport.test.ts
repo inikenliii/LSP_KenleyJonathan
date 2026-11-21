@@ -130,6 +130,8 @@ describe('reportByDay', () => {
 
   it('jumlah baris mengikuti hari dalam bulan', () => {
     expect(reportByDay([], 2027, 2).rows).toHaveLength(28);
+    expect(reportByDay([], 2100, 2).rows).toHaveLength(28); // 2100 bukan kabisat (kelipatan 100)
+    expect(reportByDay([], 2000, 2).rows).toHaveLength(29); // 2000 kabisat (kelipatan 400)
     expect(reportByDay([], 2026, 11).rows).toHaveLength(30);
     expect(reportByDay([], 2026, 12).rows).toHaveLength(31);
   });

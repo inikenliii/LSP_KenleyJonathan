@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
+  ExtensionTooFarError,
   PAYMENT_PROOF_MAX_BYTES,
   calculateExtensionCost,
   formatRupiah,
@@ -32,13 +33,14 @@ const PESAN_UKURAN = 'Ukuran bukti pembayaran paling besar 2 MB';
  * @param currentEndDate Tanggal selesai saat ini, `YYYY-MM-DD`.
  * @param newEndDate Isian tanggal selesai baru, `YYYY-MM-DD` atau kosong.
  * @param dailyPrice Salinan harga harian sewa.
- * @returns Rincian perpanjangan, atau `null` bila tanggal kosong, tidak sah, atau tidak setelah tanggal saat ini.
+ * @returns Rincian perpanjangan; `{ error }` berisi pesan bila tanggal terlalu jauh sehingga
+ *   melewati batas database; atau `null` bila tanggal kosong, tidak sah, atau tidak setelah tanggal saat ini.
  */
 function previewExtension(
   currentEndDate: string,
   newEndDate: string,
   dailyPrice: number,
-): ExtensionCostBreakdown | null {
+): ExtensionCostBreakdown | { error: string } | null {
   if (newEndDate === '') {
     return null;
   }
@@ -48,7 +50,10 @@ function previewExtension(
       newEndDate: parseIsoDate(newEndDate),
       dailyPrice,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ExtensionTooFarError) {
+      return { error: error.message };
+    }
     // Tanggal belum sah atau tidak setelah tanggal saat ini: jumlah tidak ditampilkan.
     return null;
   }
@@ -145,6 +150,8 @@ export function ExtensionForm({
             <p className="text-muted-foreground">
               Pilih tanggal selesai baru setelah {currentEndDateLabel} untuk melihat sisa biaya.
             </p>
+          ) : 'error' in preview ? (
+            <p className="text-destructive">{preview.error}</p>
           ) : (
             <dl className="flex flex-col gap-1">
               <div className="flex justify-between gap-4">
