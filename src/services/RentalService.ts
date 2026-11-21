@@ -89,12 +89,32 @@ export interface RentalView {
   dailyPrice: number;
   /** Biaya pengisian baterai. */
   chargeCost: number;
-  /** Total biaya dalam rupiah. */
+  /** Total biaya sewa awal dalam rupiah (tanpa perpanjangan). */
   totalCost: number;
+  /** Perpanjangan sewa ini, dari yang paling lama; kosong bila belum pernah diperpanjang. */
+  extensions: RentalExtensionLine[];
+  /** Jumlah sisa biaya seluruh perpanjangan. */
+  extensionTotal: number;
+  /** Total biaya yang dibayar penyewa: biaya sewa awal ditambah seluruh perpanjangan. */
+  grandTotal: number;
   /** Apakah sewa masih berlaku. */
   isActive: boolean;
   /** "Aktif" atau "Selesai". */
   statusLabel: string;
+}
+
+/** Satu perpanjangan pada sewa, untuk ditampilkan kepada penyewa. */
+export interface RentalExtensionLine {
+  /** Id perpanjangan (untuk tautan `/bukti-perpanjangan/<id>`). */
+  id: number;
+  /** Nama jenis perpanjangan ("Harian" atau "Bulanan"). */
+  typeLabel: string;
+  /** Jumlah dengan satuannya, misalnya "10 hari" atau "2 bulan". */
+  quantityLabel: string;
+  /** Tanggal berakhir baru dalam Bahasa Indonesia. */
+  newEndDateLabel: string;
+  /** Sisa biaya perpanjangan dalam rupiah. */
+  amount: number;
 }
 
 /** Isi dan tipe konten bukti pembayaran. */
@@ -136,7 +156,7 @@ export interface IRentalService {
   createRental(renterId: number, input: unknown): Promise<RentalView>;
 
   /**
-   * Mengambil semua sewa milik seorang penyewa.
+   * Mengambil semua sewa milik seorang penyewa beserta perpanjangannya.
    *
    * @param renterId Id penyewa.
    * @returns Sewa terbaru lebih dulu.
@@ -280,7 +300,8 @@ export class RentalService implements IRentalService {
   }
 
   /**
-   * Mengambil sewa milik satu penyewa; sewa penyewa lain tidak pernah ikut.
+   * Mengambil sewa milik satu penyewa beserta perpanjangannya; sewa penyewa lain
+   * tidak pernah ikut.
    *
    * @param renterId Id penyewa.
    * @returns Sewa terbaru lebih dulu.
@@ -330,6 +351,7 @@ export class RentalService implements IRentalService {
    */
   private toView(row: RentalRecord, today: Date): RentalView {
     const aktif = isRentalActive(row.endDate, today);
+    const extensionTotal = row.extensions.reduce((jumlah, item) => jumlah + item.amount, 0);
     return {
       id: row.id,
       garageId: row.garageId,
@@ -349,6 +371,15 @@ export class RentalService implements IRentalService {
       dailyPrice: row.dailyPrice,
       chargeCost: row.chargeCost,
       totalCost: row.totalCost,
+      extensions: row.extensions.map((item) => ({
+        id: item.id,
+        typeLabel: RENTAL_TYPE_LABELS[item.extensionType],
+        quantityLabel: `${item.quantity} ${item.extensionType === 'BULANAN' ? 'bulan' : 'hari'}`,
+        newEndDateLabel: formatTanggal(item.newEndDate),
+        amount: item.amount,
+      })),
+      extensionTotal,
+      grandTotal: row.totalCost + extensionTotal,
       isActive: aktif,
       statusLabel: aktif ? 'Aktif' : 'Selesai',
     };

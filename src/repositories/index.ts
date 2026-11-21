@@ -17,6 +17,7 @@ export {
 export {
   type IRentalRepository,
   type NewRentalData,
+  type RentalExtensionSummary,
   type RentalRecord,
 } from './IRentalRepository';
 export { type IReportRepository } from './IReportRepository';

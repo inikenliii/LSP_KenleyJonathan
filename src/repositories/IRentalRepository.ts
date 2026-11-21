@@ -42,6 +42,22 @@ export interface NewRentalData {
   paymentProofFile: string;
 }
 
+/** Ringkasan satu perpanjangan yang melekat pada sewa, untuk daftar sewa penyewa. */
+export interface RentalExtensionSummary {
+  /** Id perpanjangan (dipakai untuk tautan bukti pembayaran). */
+  id: number;
+  /** Jenis perpanjangan: harian atau bulanan. */
+  extensionType: RentalTypeCode;
+  /** Jumlah hari (harian) atau jumlah bulan (bulanan). */
+  quantity: number;
+  /** Jumlah hari kalender tambahan. */
+  additionalDays: number;
+  /** Tanggal berakhir baru setelah perpanjangan ini (tanggal-saja). */
+  newEndDate: Date;
+  /** Sisa biaya perpanjangan dalam rupiah bulat. */
+  amount: number;
+}
+
 /** Satu sewa yang sudah tersimpan. */
 export interface RentalRecord extends NewRentalData {
   /** Id sewa. */
@@ -50,6 +66,8 @@ export interface RentalRecord extends NewRentalData {
   garageType: GarageTypeCode;
   /** Waktu sewa dibuat. */
   createdAt: Date;
+  /** Perpanjangan sewa ini, dari yang paling lama; kosong bila belum pernah diperpanjang. */
+  extensions: RentalExtensionSummary[];
 }
 
 /** Kontrak repository sewa agar layanan tidak bergantung pada Prisma. */
@@ -88,7 +106,7 @@ export interface IRentalRepository {
   createRental(data: NewRentalData): Promise<RentalRecord>;
 
   /**
-   * Membaca semua sewa milik satu penyewa.
+   * Membaca semua sewa milik satu penyewa beserta perpanjangannya.
    *
    * @param renterId Id penyewa.
    * @returns Sewa terbaru lebih dulu.

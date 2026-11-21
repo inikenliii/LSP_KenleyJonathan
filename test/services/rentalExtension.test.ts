@@ -334,6 +334,45 @@ describe('RentalExtensionService.extendRental', () => {
     expect(detail.extensions.every((e) => e.createdAtLabel.length > 0)).toBe(true);
   });
 
+  it('Sewa Saya menyertakan perpanjangan: total, rincian, dan tanggal selesai terbaru, hanya untuk pemilik', async () => {
+    const today = todayInJakarta();
+    const pertama = await service.extendRental(admin1, isianPerpanjangan('HARIAN', 5));
+    const kedua = await service.extendRental(admin2, isianPerpanjangan('BULANAN', 1));
+
+    const [sewa] = await rentalService.listMyRentals(renterA);
+    expect(sewa.totalCost).toBe(30000);
+    expect(sewa.extensionTotal).toBe(pertama.amount + kedua.amount);
+    expect(sewa.grandTotal).toBe(30000 + pertama.amount + kedua.amount);
+    expect(sewa.endDate).toBe(kedua.newEndDate);
+    expect(sewa.extensions).toEqual([
+      {
+        id: pertama.id,
+        typeLabel: 'Harian',
+        quantityLabel: '5 hari',
+        newEndDateLabel: pertama.newEndDateLabel,
+        amount: pertama.amount,
+      },
+      {
+        id: kedua.id,
+        typeLabel: 'Bulanan',
+        quantityLabel: '1 bulan',
+        newEndDateLabel: kedua.newEndDateLabel,
+        amount: kedua.amount,
+      },
+    ]);
+    expect(pertama.previousEndDate).toBe(toIsoDate(addDays(today, 3)));
+
+    // Penyewa lain tidak melihat sewa maupun perpanjangannya.
+    expect(await rentalService.listMyRentals(renterB)).toEqual([]);
+  });
+
+  it('Sewa Saya tanpa perpanjangan: total sama dengan biaya sewa awal', async () => {
+    const [sewa] = await rentalService.listMyRentals(renterA);
+    expect(sewa.extensions).toEqual([]);
+    expect(sewa.extensionTotal).toBe(0);
+    expect(sewa.grandTotal).toBe(sewa.totalCost);
+  });
+
   it('sewa mobil listrik: perpanjangan bulanan tanpa biaya pengisian, memakai harga harian milik sewa', async () => {
     const bulanan = await buatSewaListrik();
     const hasil = await service.extendRental(admin1, {

@@ -5,11 +5,32 @@
 import { ConflictError } from '@/domain';
 import type { PrismaClient } from '@/generated/client';
 import type { GarageRecord } from './IGarageRepository';
-import type { IRentalRepository, NewRentalData, RentalRecord } from './IRentalRepository';
+import type {
+  IRentalRepository,
+  NewRentalData,
+  RentalExtensionSummary,
+  RentalRecord,
+} from './IRentalRepository';
 
 /** Pilihan kolom garasi beserta harga tipenya. */
 const GARAGE_WITH_PRICES = {
   config: { select: { dailyPrice: true, pricePerKwh: true } },
+} as const;
+
+/** Kolom sewa yang ikut dibaca: tipe garasi dan perpanjangan (paling lama lebih dulu). */
+const RENTAL_INCLUDE = {
+  garage: { select: { type: true } },
+  extensions: {
+    orderBy: { id: 'asc' },
+    select: {
+      id: true,
+      extensionType: true,
+      quantity: true,
+      additionalDays: true,
+      newEndDate: true,
+      amount: true,
+    },
+  },
 } as const;
 
 /** Implementasi IRentalRepository dengan Prisma. */
@@ -97,16 +118,13 @@ export class RentalRepository implements IRentalRepository {
       if (diubah.count !== 1) {
         throw new ConflictError('Garasi sudah disewa, pilih garasi lain');
       }
-      const baris = await tx.rental.create({
-        data,
-        include: { garage: { select: { type: true } } },
-      });
+      const baris = await tx.rental.create({ data, include: RENTAL_INCLUDE });
       return RentalRepository.toRecord(baris);
     });
   }
 
   /**
-   * Membaca sewa milik satu penyewa, terbaru lebih dulu.
+   * Membaca sewa milik satu penyewa beserta perpanjangannya, terbaru lebih dulu.
    *
    * @param renterId Id penyewa.
    * @returns Sewa penyewa itu saja.
@@ -115,7 +133,7 @@ export class RentalRepository implements IRentalRepository {
     const baris = await this.prisma.rental.findMany({
       where: { renterId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      include: { garage: { select: { type: true } } },
+      include: RENTAL_INCLUDE,
     });
     return baris.map((item) => RentalRepository.toRecord(item));
   }
@@ -129,7 +147,7 @@ export class RentalRepository implements IRentalRepository {
   async findById(id: number): Promise<RentalRecord | null> {
     const baris = await this.prisma.rental.findUnique({
       where: { id },
-      include: { garage: { select: { type: true } } },
+      include: RENTAL_INCLUDE,
     });
     return baris === null ? null : RentalRepository.toRecord(baris);
   }
@@ -162,6 +180,14 @@ export class RentalRepository implements IRentalRepository {
     paymentProofFile: string;
     createdAt: Date;
     garage: { type: RentalRecord['garageType'] };
+    extensions: Array<{
+      id: number;
+      extensionType: RentalExtensionSummary['extensionType'];
+      quantity: number;
+      additionalDays: number;
+      newEndDate: Date;
+      amount: number;
+    }>;
   }): RentalRecord {
     return {
       id: baris.id,
@@ -184,6 +210,14 @@ export class RentalRepository implements IRentalRepository {
       totalCost: baris.totalCost,
       paymentProofFile: baris.paymentProofFile,
       createdAt: baris.createdAt,
+      extensions: baris.extensions.map((perpanjangan) => ({
+        id: perpanjangan.id,
+        extensionType: perpanjangan.extensionType,
+        quantity: perpanjangan.quantity,
+        additionalDays: perpanjangan.additionalDays,
+        newEndDate: perpanjangan.newEndDate,
+        amount: perpanjangan.amount,
+      })),
     };
   }
 }

@@ -23,6 +23,7 @@ export {
   type NewRentalOptions,
   type PaymentProofFile,
   type ProofViewer,
+  type RentalExtensionLine,
   type RentalView,
 } from './RentalService';
 export {
