@@ -17,6 +17,7 @@ export function createAdminRouter(controllers) {
 
   router.get('/', controllers.dashboard.admin);
   router.get('/pendaftar', controllers.verification.index);
+  router.post('/pendaftar/:id/keputusan', controllers.verification.decide);
 
   return router;
 }

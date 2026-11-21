@@ -113,4 +113,23 @@ export class UserRepository {
     });
     return rows.map((row) => User.fromRecord(row));
   }
+
+  /**
+   * Menyimpan keputusan verifikasi, hanya bila penyewa masih PENDING. Kondisi
+   * pada update membuat klik ganda atau dua admin sekaligus aman: update kedua
+   * tidak mengenai baris mana pun.
+   *
+   * @param {number} id Id penyewa.
+   * @param {object} decision Keputusan.
+   * @param {string} decision.status Status baru (ACCEPTED atau REJECTED).
+   * @param {number} decision.verifiedById Id admin yang memutuskan.
+   * @returns {Promise<number>} Jumlah baris yang berubah (0 bila sudah tidak PENDING).
+   */
+  async decideVerification(id, { status, verifiedById }) {
+    const result = await this.prisma.user.updateMany({
+      where: { id, role: User.ROLE.RENTER, verificationStatus: User.STATUS.PENDING },
+      data: { verificationStatus: status, verifiedAt: new Date(), verifiedById },
+    });
+    return result.count;
+  }
 }

@@ -34,7 +34,23 @@
         <td>{{ registrant.email }}</td>
         <td>{{ registrant.createdAt | tanggal }}</td>
         <td><span class="badge badge--pending">Menunggu verifikasi</span></td>
-        <td></td>
+        <td>
+          {% if rowError and rowError.userId == (registrant.id | string) %}
+          <p class="field-error" role="alert">{{ rowError.message }}</p>
+          {% endif %}
+          <form class="inline-form" method="post" action="/admin/pendaftar/{{ registrant.id }}/keputusan">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="decision" value="ACCEPT">
+            <input id="ktp-{{ registrant.id }}" name="ktpValidated" type="checkbox" value="on" required>
+            <label for="ktp-{{ registrant.id }}">KTP sudah divalidasi</label>
+            <button class="btn btn--primary" type="submit">Terima</button>
+          </form>
+          <form class="inline-form" method="post" action="/admin/pendaftar/{{ registrant.id }}/keputusan">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="decision" value="REJECT">
+            <button class="btn btn--danger" type="submit">Tolak</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
