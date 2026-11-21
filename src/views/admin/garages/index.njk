@@ -14,6 +14,7 @@
         <th scope="col">Tipe</th>
         <th scope="col">Awalan ID</th>
         <th scope="col">Harga Harian</th>
+        <th scope="col">Harga Bulanan</th>
         <th scope="col">Harga per kWh</th>
         <th scope="col">Jumlah Garasi</th>
         <th scope="col">Sisa Kuota</th>
@@ -25,6 +26,7 @@
         <td>{{ config.label }}</td>
         <td>{{ config.prefix }}</td>
         <td>{% if config.priceIsSet %}{{ config.dailyPrice | rupiah }}{% else %}Belum diatur{% endif %}</td>
+        <td>{% if config.priceIsSet %}{{ config.monthlyPrice | rupiah }}{% else %}Belum diatur{% endif %}</td>
         <td>
           {% if not config.usesKwhPrice %}-
           {% elif config.pricePerKwh !== null %}{{ config.pricePerKwh | rupiah }}
@@ -93,4 +95,41 @@
 
   <button class="btn btn--primary" type="submit">Buat Garasi</button>
 </form>
+
+<h2>Daftar Garasi</h2>
+<p>Total {{ garages.total }} garasi</p>
+{% if garages.items | length %}
+<div class="table-wrapper">
+  <table class="table">
+    <caption>Daftar garasi</caption>
+    <thead>
+      <tr>
+        <th scope="col">ID</th>
+        <th scope="col">Tipe</th>
+        <th scope="col">Harga Harian</th>
+        <th scope="col">Harga Bulanan</th>
+        <th scope="col">Harga per kWh</th>
+        <th scope="col">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for garage in garages.items %}
+      <tr data-garage-id="{{ garage.id }}">
+        <td>{{ garage.id }}</td>
+        <td>{{ garage.typeLabel }}</td>
+        <td>{{ garage.dailyPrice | rupiah }}</td>
+        <td>{{ garage.monthlyPrice | rupiah }}</td>
+        <td>{% if garage.usesKwhPrice %}{{ garage.pricePerKwh | rupiah }}{% else %}-{% endif %}</td>
+        <td>
+          {% if garage.statusCode == 'AVAILABLE' %}<span class="badge badge--available">{{ garage.statusLabel }}</span>
+          {% else %}<span class="badge badge--used">{{ garage.statusLabel }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><p>Belum ada garasi.</p></div>
+{% endif %}
 {% endblock %}

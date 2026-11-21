@@ -33,7 +33,7 @@ export class GarageController {
   }
 
   /**
-   * Merender halaman Kelola Garasi.
+   * Merender halaman Kelola Garasi beserta daftar semua garasi.
    *
    * @param {import('express').Response} res Respons.
    * @param {number} status Kode status HTTP.
@@ -45,11 +45,12 @@ export class GarageController {
    */
   async #renderPage(res, status, { values = {}, errors = {} } = {}) {
     const configs = await this.garageService.getTypeConfigs();
-    res.status(status).render('admin/garages/index', { configs, values, errors });
+    const garages = await this.garageService.listGarages();
+    res.status(status).render('admin/garages/index', { configs, garages, values, errors });
   }
 
   /**
-   * Menampilkan tabel harga per tipe dan formulir pembuatan garasi.
+   * Menampilkan tabel harga per tipe, formulir pembuatan garasi, dan daftar garasi.
    *
    * @param {import('express').Request} req Permintaan.
    * @param {import('express').Response} res Respons.

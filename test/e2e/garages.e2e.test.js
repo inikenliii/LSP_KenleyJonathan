@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import {
   HttpClient,
   adminCredentials,
+  countRows,
   extractRow,
   registerRenter,
   startTestApp,
@@ -240,4 +241,50 @@ test('garasi-batch: batch yang melampaui batas 999 ditolak tanpa mengubah data',
   const cfg = await config('CAR');
   assert.equal(cfg.dailyPrice, 15000);
   assert.equal(cfg.lastNumber, 999);
+});
+
+test('garasi-daftar: daftar menampilkan ID, tipe, harga harian, bulanan 25x, per kWh dan status', async () => {
+  const admin = await adminClient();
+  const page = await admin.get('/admin/garasi');
+  assert.equal(page.status, 200);
+
+  const bicycle = extractRow(page.text, 'garage-id', 'S001');
+  assert.ok(bicycle, 'baris S001 harus ada');
+  for (const text of ['Sepeda', 'Rp 5.000', 'Rp 125.000', 'tersedia']) {
+    assert.ok(bicycle.includes(text), `baris S001 harus memuat ${text}`);
+  }
+
+  const electric = extractRow(page.text, 'garage-id', 'E001');
+  assert.ok(electric, 'baris E001 harus ada');
+  for (const text of ['Mobil Listrik', 'Rp 20.000', 'Rp 500.000', 'Rp 2.500', 'tersedia']) {
+    assert.ok(electric.includes(text), `baris E001 harus memuat ${text}`);
+  }
+
+  const car = extractRow(page.text, 'garage-id', 'C001');
+  assert.ok(car, 'baris C001 harus ada');
+  assert.ok(car.includes('Rp 15.000'));
+  assert.ok(car.includes('Rp 375.000'));
+
+  assert.equal(countRows(page.text, 'garage-id'), await ctx.prisma.garage.count());
+});
+
+test('garasi-daftar: tabel harga per tipe menampilkan harga bulanan', async () => {
+  const admin = await adminClient();
+  const page = await admin.get('/admin/garasi');
+  const expected = { BICYCLE: 'Rp 125.000', CAR: 'Rp 375.000', ELECTRIC_CAR: 'Rp 500.000' };
+  for (const [code, price] of Object.entries(expected)) {
+    const row = extractRow(page.text, 'garage-type', code);
+    assert.ok(row, `baris untuk ${code} harus ada`);
+    assert.ok(row.includes(price), `${code} harus menampilkan ${price}`);
+  }
+});
+
+test('garasi-daftar: status used ditampilkan', async () => {
+  await ctx.prisma.garage.update({ where: { id: 'S002' }, data: { status: 'USED' } });
+  const admin = await adminClient();
+  const page = await admin.get('/admin/garasi');
+  const row = extractRow(page.text, 'garage-id', 'S002');
+  assert.ok(row, 'baris S002 harus ada');
+  assert.ok(row.includes('used'));
+  assert.ok(!row.includes('tersedia'));
 });

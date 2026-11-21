@@ -26,6 +26,18 @@ export class GarageRepository {
   }
 
   /**
+   * Membaca semua garasi beserta harga tipenya, urut menurut ID.
+   *
+   * @returns {Promise<Array<{ id: string, type: string, status: string, config: { dailyPrice: number, pricePerKwh: number|null } }>>}
+   */
+  async findAll() {
+    return this.prisma.garage.findMany({
+      orderBy: { id: 'asc' },
+      include: { config: { select: { dailyPrice: true, pricePerKwh: true } } },
+    });
+  }
+
+  /**
    * Membuat satu batch garasi dalam satu transaksi. Penghitung nomor tipe
    * dinaikkan lebih dulu dengan satu perintah UPDATE; UPDATE itu mengunci baris
    * tipe sehingga batch bersamaan berjalan bergantian dan tidak ada ID ganda
