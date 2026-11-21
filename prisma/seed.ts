@@ -5,22 +5,29 @@
  * hanya hash bcrypt yang disimpan ke database.
  */
 import dotenv from 'dotenv';
-import bcrypt from 'bcryptjs';
-import { prisma, disconnectDatabase } from '../src/db/prisma.js';
-import { User } from '../src/domain/User.js';
-import { GARAGE_TYPE_CODES } from '../src/domain/garage/index.js';
+import { GarageType, Role, VerificationStatus } from '../src/generated/enums';
+import { BcryptPasswordHasher } from '../src/lib/password-hasher';
+import { createPrismaClient } from '../src/lib/prisma-client';
 
 dotenv.config({ quiet: true });
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error('DATABASE_URL belum diatur di file .env.');
+  process.exit(1);
+}
+
+const prisma = createPrismaClient(databaseUrl);
 
 /**
  * Membuat atau memperbarui akun Admin dari ADMIN_EMAIL, ADMIN_PASSWORD, dan
  * ADMIN_NAME. Mengubah ADMIN_PASSWORD lalu menjalankan seed ulang akan
  * mengganti password Admin.
  *
- * @returns {Promise<void>}
+ * @returns Promise yang selesai setelah akun Admin tersimpan.
  * @throws {Error} Bila kunci wajib kosong atau tidak valid (tanpa menyebut nilainya).
  */
-async function seedAdmin() {
+async function seedAdmin(): Promise<void> {
   const email = String(process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD ?? '';
   const fullName = String(process.env.ADMIN_NAME ?? '').trim() || 'Administrator';
@@ -32,7 +39,7 @@ async function seedAdmin() {
     throw new Error('ADMIN_PASSWORD harus 8 sampai 72 karakter.');
   }
 
-  const passwordHash = await bcrypt.hash(password, User.PASSWORD_HASH_ROUNDS);
+  const passwordHash = await new BcryptPasswordHasher().hash(password);
 
   await prisma.user.upsert({
     where: { email },
@@ -40,15 +47,15 @@ async function seedAdmin() {
       email,
       fullName,
       passwordHash,
-      role: User.ROLE.ADMIN,
-      verificationStatus: User.STATUS.ACCEPTED,
+      role: Role.ADMIN,
+      verificationStatus: VerificationStatus.ACCEPTED,
       verifiedAt: new Date(),
     },
     update: {
       fullName,
       passwordHash,
-      role: User.ROLE.ADMIN,
-      verificationStatus: User.STATUS.ACCEPTED,
+      role: Role.ADMIN,
+      verificationStatus: VerificationStatus.ACCEPTED,
     },
   });
 }
@@ -57,11 +64,11 @@ async function seedAdmin() {
  * Membuat satu baris konfigurasi untuk setiap tipe garasi. Baris yang sudah
  * ada dibiarkan, sehingga harga dan penghitung ID tidak tertimpa.
  *
- * @returns {Promise<void>}
+ * @returns Promise yang selesai setelah ketiga baris konfigurasi tersedia.
  */
-async function seedGarageTypeConfigs() {
+async function seedGarageTypeConfigs(): Promise<void> {
   await prisma.garageTypeConfig.createMany({
-    data: GARAGE_TYPE_CODES.map((type) => ({ type })),
+    data: Object.values(GarageType).map((type) => ({ type })),
     skipDuplicates: true,
   });
 }
@@ -69,9 +76,9 @@ async function seedGarageTypeConfigs() {
 /**
  * Titik masuk seed.
  *
- * @returns {Promise<void>}
+ * @returns Promise yang selesai setelah seluruh data awal siap.
  */
-async function main() {
+async function main(): Promise<void> {
   await seedAdmin();
   console.log('Seed selesai: akun admin siap.');
   await seedGarageTypeConfigs();
@@ -81,8 +88,8 @@ async function main() {
 try {
   await main();
 } catch (err) {
-  console.error(err.message);
+  console.error(err instanceof Error ? err.message : 'Seed gagal.');
   process.exitCode = 1;
 } finally {
-  await disconnectDatabase();
+  await prisma.$disconnect();
 }

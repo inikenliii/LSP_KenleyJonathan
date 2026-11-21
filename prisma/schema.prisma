@@ -1,10 +1,11 @@
 // Skema database aplikasi penyewaan garasi (PostgreSQL).
-// URL koneksi tidak ditulis di sini; lihat prisma.config.js.
+// URL koneksi tidak ditulis di sini; lihat prisma.config.ts.
 
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated"
   moduleFormat = "esm"
+  importFileExtension = "ts"
 }
 
 datasource db {
@@ -27,6 +28,7 @@ enum VerificationStatus {
 // Akun pengguna (Admin dan Penyewa). Email disimpan huruf kecil.
 model User {
   id                 Int                @id @default(autoincrement())
+  // Unik: satu NIK hanya boleh dimiliki satu akun penyewa.
   nik                String?            @unique @db.VarChar(16) // kosong hanya untuk akun Admin hasil seed
   fullName           String             @map("full_name") @db.VarChar(100)
   phone              String?            @db.VarChar(20)
@@ -47,8 +49,8 @@ model User {
   @@map("users")
 }
 
-// Tabel sesi login yang dipakai connect-pg-simple. Dimodelkan di sini agar
-// dibuat oleh migrasi dan tidak menyebabkan drift pada Prisma.
+// Tabel sesi login aplikasi: sid berisi hash SHA-256 dari token cookie,
+// sess berisi userId, dan expire adalah waktu kedaluwarsa sesi.
 model Session {
   sid    String   @id @db.VarChar
   sess   Json     @db.Json
