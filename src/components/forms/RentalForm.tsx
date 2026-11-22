@@ -392,6 +392,7 @@ export function RentalForm({
               id="days"
               name="days"
               type="number"
+              onWheel={(event) => event.currentTarget.blur()}
               min={1}
               max={maxDailyDays}
               value={days}

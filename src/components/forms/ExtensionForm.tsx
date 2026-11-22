@@ -187,6 +187,7 @@ export function ExtensionForm({
             id="quantity"
             name="quantity"
             type="number"
+            onWheel={(event) => event.currentTarget.blur()}
             inputMode="numeric"
             min={1}
             step={1}

@@ -97,6 +97,7 @@ export function GarageBatchForm({
             id="quantity"
             name="quantity"
             type="number"
+            onWheel={(event) => event.currentTarget.blur()}
             min={1}
             max={999}
             value={quantity}
@@ -116,6 +117,7 @@ export function GarageBatchForm({
             id="dailyPrice"
             name="dailyPrice"
             type="number"
+            onWheel={(event) => event.currentTarget.blur()}
             min={1}
             value={dailyPrice}
             onChange={(event) => setDailyPrice(event.target.value)}
@@ -134,6 +136,7 @@ export function GarageBatchForm({
             id="pricePerKwh"
             name="pricePerKwh"
             type="number"
+            onWheel={(event) => event.currentTarget.blur()}
             min={1}
             value={pricePerKwh}
             onChange={(event) => setPricePerKwh(event.target.value)}
