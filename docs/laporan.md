@@ -10,15 +10,7 @@ Program Studi : Informatika, Universitas Ciputra
 Nama Asesor : Citra Lestari
 Tanggal : 22 November 2026
 
-## 1. Pendahuluan
-
-Aplikasi ini adalah aplikasi web untuk perusahaan penyewaan garasi kendaraan. Garasi ada tiga tipe: sepeda, mobil, dan mobil listrik. Garasi disewa harian atau bulanan, dan datanya disimpan di database relasional PostgreSQL.
-
-Ada dua peran. Penyewa mendaftar, masuk setelah pendaftarannya diterima Admin, membuat sewa baru (harian atau bulanan) dengan mengunggah bukti pembayaran, dan melihat daftar sewanya. Admin dibuat lewat seed, bukan lewat registrasi; Admin memverifikasi pendaftar, membuat garasi secara berkelompok dan mengatur harganya, melihat daftar garasi, memperpanjang sewa yang sedang aktif, dan melihat laporan penyewaan per bulan, per hari, per tipe garasi, dan per penyewa.
-
-Aplikasi dibuat dengan Next.js dan TypeScript, memakai PostgreSQL lewat Prisma ORM, diuji dengan Vitest, dan seluruh kode serta dokumentasinya ditulis dalam Bahasa Indonesia.
-
-## 2. Use Case Diagram
+## 1. Use Case Diagram
 
 Use case diagram memuat tiga aktor (Pengguna, Penyewa, dan Admin) dan 25 use case. Penyewa dan Admin adalah turunan aktor Pengguna sehingga keduanya memakai Login dan Logout.
 
@@ -41,7 +33,7 @@ Tabel berikut menjelaskan use case utama pada diagram.
 | Lihat Riwayat Perpanjangan | Admin | Admin melihat riwayat perpanjangan sebuah sewa. |
 | Lihat Laporan Sewa | Admin | Admin melihat laporan per bulan, per hari, per tipe garasi, dan per penyewa. |
 
-## 3. Class Diagram
+## 2. Class Diagram
 
 Alur permintaan dalam aplikasi: halaman atau Server Action memanggil service, service memanggil repository, dan repository mengakses database PostgreSQL lewat Prisma. Aturan bisnis ada di lapisan domain yang murni tanpa akses database, dan `src/lib/container.ts` merakit objek serta menyuntikkan ketergantungan. Aplikasi memakai arsitektur berlapis (layered) yang mengikuti pola MVC: View berupa halaman React, Controller berupa Server Action, dan Model terdiri atas service, domain, dan repository yang dihubungkan dengan dependency injection.
 
@@ -85,7 +77,7 @@ Penerapan konsep pemrograman berorientasi objek pada kode:
 | Exception class | Semua error aplikasi mewarisi `AppError`; `ValidationError` membawa pesan per field. Fungsi `toAppError` membungkus error tak terduga menjadi `DatabaseError` dengan pesan umum. |
 | Overloading metode | Metode `describe` pada `Garage` punya tiga tanda tangan: tanpa argumen, dengan harga harian, dan dengan harga harian serta harga per kWh. |
 
-## 4. Entity Relationship Diagram
+## 3. Entity Relationship Diagram
 
 ![Entity Relationship Diagram: enam tabel database beserta relasinya](diagram/img/erd.png)
 
@@ -113,7 +105,7 @@ Relasi antartabel:
 
 Tabel `session` tidak memiliki relasi kunci asing.
 
-## 5. Library dan Komponen yang Digunakan
+## 4. Library dan Komponen yang Digunakan
 
 Versi library sesuai dengan `package.json`.
 
@@ -136,29 +128,29 @@ Versi library sesuai dengan `package.json`.
 | TypeDoc 0.28.20 | Membuat dokumentasi API dari komentar TSDoc. |
 | dotenv 18.0.10 dan tsx 4.23.15 | Membaca berkas `.env` dan menjalankan seed TypeScript. |
 
-## 6. Fitur Aplikasi
+## 5. Fitur Aplikasi
 
 Tangkapan layar diambil dari aplikasi yang berjalan (`npm start`, lalu buka http://localhost:3000).
 
-### 6.1 Masuk
+### 5.1 Masuk
 
 Pengguna masuk dengan email dan password. Akun yang belum diterima Admin ditolak dengan pesan yang jelas.
 
 ![Halaman Masuk](tangkapan-layar/02-login.png)
 
-### 6.2 Pendaftaran Penyewa
+### 5.2 Pendaftaran Penyewa
 
 Calon penyewa mengisi NIK, nama lengkap, nomor telepon, email, dan password. Akun baru berstatus Menunggu verifikasi.
 
 ![Halaman Pendaftaran Penyewa](tangkapan-layar/01-registrasi.png)
 
-### 6.3 Verifikasi Pendaftar
+### 5.3 Verifikasi Pendaftar
 
 Admin melihat pendaftar berstatus menunggu, lalu menerima (setelah mencentang validasi KTP) atau menolak.
 
 ![Halaman Verifikasi Pendaftar](tangkapan-layar/03-verifikasi-pendaftar.png)
 
-### 6.4 Buat Garasi dan Daftar Garasi
+### 5.4 Buat Garasi dan Daftar Garasi
 
 Admin mengatur harga per tipe garasi, lalu membuat garasi secara berkelompok. ID dibuat otomatis berurutan (S001, C001, E001, dan seterusnya). Daftar semua garasi menampilkan tipe, harga harian, harga bulanan, harga per kWh (khusus mobil listrik), dan status.
 
@@ -166,26 +158,26 @@ Admin mengatur harga per tipe garasi, lalu membuat garasi secara berkelompok. ID
 
 ![Halaman Daftar Garasi](tangkapan-layar/05-daftar-garasi.png)
 
-### 6.5 Sewa Baru
+### 5.5 Sewa Baru
 
-Penyewa yang sudah diterima memilih sewa harian atau bulanan, mengisi data kendaraan, memilih garasi yang tersedia, dan mengunggah bukti pembayaran. Total biaya ditampilkan, termasuk biaya pengisian untuk mobil listrik di garasi mobil listrik.
+Penyewa yang sudah diterima memilih sewa harian atau bulanan, mengisi data kendaraan, memilih tanggal mulai, memilih garasi yang tersedia, dan mengunggah bukti pembayaran. Tanggal mulai bawaannya hari ini (zona waktu Asia/Jakarta) dan dapat dipilih dari hari ini sampai satu tahun ke depan; tanggal yang sudah lewat ditolak. Tanggal selesai, batas jumlah hari sewa harian, dan ringkasan biaya mengikuti bulan tanggal mulai yang dipilih. Total biaya ditampilkan, termasuk biaya pengisian untuk mobil listrik di garasi mobil listrik.
 
 ![Halaman Sewa Baru](tangkapan-layar/06-sewa-baru.png)
 
-### 6.6 Sewa Saya
+### 5.6 Sewa Saya
 
 Daftar sewa milik Penyewa beserta tanggal mulai dan berakhir, biaya, status, dan tautan bukti pembayaran.
- Total biaya sebuah sewa sudah termasuk semua perpanjangannya, dengan keterangan "termasuk perpanjangan" di bawah angkanya. Perpanjangan ditampilkan sebagai daftar di bawah sewa yang bersangkutan, lengkap dengan jenis dan jumlahnya, tanggal selesai baru, biaya, dan tautan "Lihat bukti".
+ Total biaya sebuah sewa sudah termasuk semua perpanjangannya, dengan keterangan "termasuk perpanjangan" di bawah angkanya. Sewa yang tanggal mulainya belum tiba berstatus "Belum mulai". Perpanjangan ditampilkan sebagai daftar di bawah sewa yang bersangkutan, lengkap dengan jenis dan jumlahnya, tanggal selesai baru, biaya, dan tautan "Lihat bukti".
 
 ![Halaman Sewa Saya](tangkapan-layar/07-sewa-saya.png)
 
-### 6.7 Perpanjang Sewa (Harian atau Bulanan)
+### 5.7 Perpanjang Sewa (Harian atau Bulanan)
 
 Admin memperpanjang sewa yang sedang berlaku secara harian (jumlah hari) atau bulanan (jumlah bulan), mengunggah bukti pembayaran, dan melihat riwayat perpanjangan. Tanggal berakhir baru dan sisa biaya dihitung otomatis.
 
 ![Halaman Perpanjang Sewa](tangkapan-layar/08-perpanjangan.png)
 
-### 6.8 Laporan Sewa
+### 5.8 Laporan Sewa
 
 Admin melihat laporan penyewaan dalam empat tampilan: per bulan (jumlah sewa dan jumlah uang untuk 12 bulan pada tahun yang dipilih), per hari (setiap tanggal pada bulan yang dipilih), per tipe garasi (sepeda, mobil, dan mobil listrik), dan per penyewa (setiap penyewa yang pernah menyewa).
 
@@ -197,9 +189,9 @@ Admin melihat laporan penyewaan dalam empat tampilan: per bulan (jumlah sewa dan
 
 ![Halaman Laporan Sewa: per penyewa](tangkapan-layar/12-laporan-per-penyewa.png)
 
-## 7. Skenario Unit Testing
+## 6. Skenario Unit Testing
 
-Unit test dibuat dengan Vitest dan dijalankan dengan perintah `npm test`. Hasil proses terakhir: 255 dari 255 tes lulus (22 berkas tes). Tes pada folder `test/unit` menguji fungsi dan kelas domain tanpa database, sedangkan tes pada folder `test/services` menguji layanan dengan database PostgreSQL terpisah yang namanya berakhiran `_test`. Tabel berikut memuat 31 skenario yang mewakili seluruh aturan bisnis; daftar 99 skenario terpilih ada di `docs/skenario-pengujian.md`.
+Unit test dibuat dengan Vitest dan dijalankan dengan perintah `npm test`. Hasil proses terakhir: 277 dari 277 tes lulus (23 berkas tes). Tes pada folder `test/unit` menguji fungsi dan kelas domain tanpa database, sedangkan tes pada folder `test/services` menguji layanan dengan database PostgreSQL terpisah yang namanya berakhiran `_test`. Tabel berikut memuat 31 skenario yang mewakili seluruh aturan bisnis; daftar 100 skenario terpilih ada di `docs/skenario-pengujian.md`.
 
 | ID | Kelas / Method | Skenario | Input | Hasil yang Diharapkan | Hasil Aktual | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -237,7 +229,7 @@ Unit test dibuat dengan Vitest dan dijalankan dengan perintah `npm test`. Hasil 
 
 ![Hasil unit test](tangkapan-layar/13-hasil-unit-test.png)
 
-## 8. Link GitHub
+## 7. Link GitHub
 
 Kode program dapat diakses pada repository berikut:
 
@@ -245,7 +237,7 @@ https://github.com/inikenliii/LSP_KenleyJonathan
 
 > Catatan untuk peserta (hapus sebelum laporan dikumpulkan): saat dokumen ini ditulis, repositori masih privat. Sebelum batas waktu, ubah repositori menjadi publik atau tambahkan asesor sebagai collaborator agar tautan di atas dapat dibuka.
 
-## 9. Catatan
+## 8. Catatan
 
 Ketentuan berikut adalah asumsi dan keputusan yang tidak ditetapkan secara rinci pada soal; semuanya dijalankan oleh kode dan diuji otomatis.
 
@@ -253,15 +245,17 @@ Ketentuan berikut adalah asumsi dan keputusan yang tidak ditetapkan secara rinci
 | --- | --- |
 | 1 | Harga sewa bulanan adalah 25 kali harga harian. Tanggal berakhir sewa bulanan adalah tanggal mulai ditambah jumlah hari pada bulan tanggal mulai (Februari 28 atau 29 hari pada tahun kabisat). |
 | 2 | Jumlah hari sewa harian paling sedikit 1 dan paling banyak jumlah hari pada bulan tanggal mulai dikurangi 1. Biaya sewa harian adalah jumlah hari kali harga harian. |
-| 3 | Tanggal mulai sewa adalah hari ini menurut zona waktu Asia/Jakarta. |
+| 3 | Tanggal mulai sewa dipilih penyewa pada formulir Sewa Baru. Nilai bawaannya hari ini menurut zona waktu Asia/Jakarta, paling awal hari ini, dan paling jauh satu tahun ke depan. Bila dikosongkan, tanggal mulai dianggap hari ini. Server memeriksa ulang dengan tanggal hari ininya sendiri dan menolak tanggal yang sudah lewat. |
 | 4 | Biaya pengisian listrik adalah (kapasitas baterai dikurangi sisa baterai) kali harga per kWh, dibulatkan ke rupiah terdekat. Biaya ini hanya berlaku untuk mobil listrik yang disimpan di garasi mobil listrik; di garasi mobil biasa tidak ada biaya pengisian. |
 | 5 | Sepeda dan sepeda motor hanya boleh di garasi sepeda, mobil hanya di garasi mobil, dan mobil listrik boleh di garasi mobil atau garasi mobil listrik. Plat nomor wajib kecuali untuk sepeda. |
 | 6 | Garasi yang disewa berstatus terpakai dan kembali tersedia setelah tanggal berakhir sewanya lewat; pada tanggal berakhir garasi masih terpakai. |
 | 7 | Perpanjangan dilakukan oleh Admin pada sewa yang sedang berlaku. Perpanjangan harian adalah 1 sampai jumlah hari pada bulan tanggal berakhir dikurangi 1, dengan biaya jumlah hari kali harga harian sewa itu. Perpanjangan bulanan adalah 1 sampai 1200 bulan, dengan biaya jumlah bulan kali 25 kali harga harian sewa itu. |
-| 8 | Laporan penyewaan mengelompokkan sebuah sewa menurut tanggal mulainya, dengan jumlah uang sama dengan total biaya sewa ditambah semua biaya perpanjangannya. |
+| 8 | Laporan penyewaan mengelompokkan sebuah sewa menurut tanggal mulainya, dengan jumlah uang sama dengan total biaya sewa ditambah semua biaya perpanjangannya; sewa yang tanggal mulainya di masa depan masuk ke periode tanggal mulainya. |
 | 9 | Bukti pembayaran wajib diunggah, berupa gambar JPEG, PNG, atau WebP (dikenali dari isi berkas) dengan ukuran paling besar 2 MB, dan disimpan di luar folder publik aplikasi. |
 | 10 | Tidak ada tambahan atau potongan biaya selain aturan tertulis di atas: total biaya sama dengan biaya sewa ditambah biaya pengisian listrik (bila ada). |
 | 11 | Percobaan masuk dibatasi per kombinasi email dan alamat IP: setelah melewati batas, percobaan berikutnya ditolak sampai jendela waktunya berakhir. Batas ini disimpan di memori server, bawaannya 10 percobaan per 15 menit, dan dapat diatur dengan variabel lingkungan `AUTH_RATE_LIMIT_MAX`. |
 | 12 | Password paling panjang 72 byte karena batas algoritma bcrypt; panjangnya dihitung dalam byte, bukan jumlah karakter. |
 | 13 | Isian angka hanya menerima digit biasa; bentuk seperti heksadesimal, eksponen, atau tanda plus ditolak. |
 | 14 | Setiap respons membawa header keamanan (X-Frame-Options, X-Content-Type-Options nosniff, Referrer-Policy, dan Content-Security-Policy dengan frame-ancestors), dan header X-Powered-By dimatikan. |
+| 15 | Sewa yang tanggal mulainya di masa depan berstatus "Belum mulai" di Sewa Saya dan belum dapat diperpanjang sampai tanggal mulainya tiba. |
+| 16 | Garasi langsung berstatus terpakai begitu sewa disimpan, juga untuk sewa dengan tanggal mulai di masa depan (asumsi). Garasi tetap dilepas oleh aturan pelepasan yang sama, yaitu setelah tanggal berakhir sewa lewat. |
