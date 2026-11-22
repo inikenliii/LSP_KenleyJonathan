@@ -458,11 +458,229 @@ describe('aturan kendaraan dan garasi', () => {
   it('isian dari klien untuk penyewa, harga, dan tanggal diabaikan', async () => {
     await service.createRental(
       renterA,
-      isianSepeda({ renterId: renterB, totalCost: 1, dailyPrice: 1, startDate: '2000-01-01' }),
+      isianSepeda({ renterId: renterB, totalCost: 1, dailyPrice: 1, endDate: '2000-01-01' }),
     );
     const baris = await prisma.rental.findFirstOrThrow();
     expect(baris.renterId).toBe(renterA);
     expect(baris.totalCost).toBe(30000);
     expect(toIsoDate(baris.startDate)).toBe(toIsoDate(todayInJakarta()));
+  });
+});
+
+describe('RentalService.createRental: tanggal mulai dipilih penyewa', () => {
+  /** Jam tetap: 22 November 2026 pukul 10.00 WIB, sehingga "hari ini" menurut server 2026-11-22. */
+  const JAM_TETAP = new Date('2026-11-22T03:00:00Z');
+
+  /**
+   * Membuat layanan sewa dengan jam tetap.
+   *
+   * @param sekarang Waktu yang dipakai layanan.
+   * @returns Layanan sewa dengan penyimpanan bukti uji.
+   */
+  function layananDenganJam(sekarang: Date): RentalService {
+    return new RentalService(
+      new RentalRepository(prisma),
+      new LocalPaymentProofStorage(proofDir),
+      () => sekarang,
+    );
+  }
+
+  /**
+   * Memastikan tidak ada sewa tersimpan, garasi S001 tetap tersedia, dan tidak ada berkas.
+   */
+  async function pastikanTidakAdaYangTersimpan(): Promise<void> {
+    expect(await prisma.rental.count()).toBe(0);
+    expect((await prisma.garage.findUniqueOrThrow({ where: { id: 'S001' } })).status).toBe(
+      'AVAILABLE',
+    );
+    expect(await berkasBukti()).toHaveLength(0);
+  }
+
+  /**
+   * Menjalankan sewa dengan layanan tertentu dan mengembalikan error validasinya.
+   *
+   * @param layanan Layanan sewa yang dipakai.
+   * @param override Isian yang menimpa isian dasar.
+   * @returns Error validasi yang dilempar layanan.
+   */
+  async function galatValidasiDengan(
+    layanan: RentalService,
+    override: Record<string, unknown>,
+  ): Promise<ValidationError> {
+    try {
+      await layanan.createRental(renterA, isianSepeda(override));
+    } catch (error) {
+      expect(error).toBeInstanceOf(ValidationError);
+      return error as ValidationError;
+    }
+    throw new Error('Seharusnya melempar ValidationError.');
+  }
+
+  it('menawarkan batas tanggal mulai: hari ini sampai satu tahun ke depan', async () => {
+    const pilihan = await layananDenganJam(JAM_TETAP).getNewRentalOptions();
+    expect(pilihan.today).toBe('2026-11-22');
+    expect(pilihan.maxStartDate).toBe('2027-11-22');
+  });
+
+  it('menerima tanggal mulai hari ini', async () => {
+    const layanan = layananDenganJam(JAM_TETAP);
+    const sewa = await layanan.createRental(renterA, isianSepeda({ startDate: '2026-11-22' }));
+    expect(sewa.startDate).toBe('2026-11-22');
+    expect(sewa.endDate).toBe('2026-11-25');
+    expect(sewa.statusLabel).toBe('Aktif');
+  });
+
+  it('tanpa tanggal mulai, memakai hari ini menurut server', async () => {
+    const layanan = layananDenganJam(JAM_TETAP);
+    const sewa = await layanan.createRental(renterA, isianSepeda());
+    expect(sewa.startDate).toBe('2026-11-22');
+  });
+
+  it('menerima tanggal mulai besok: harian dihitung dari tanggal itu, garasi langsung used', async () => {
+    const layanan = layananDenganJam(JAM_TETAP);
+    const sewa = await layanan.createRental(renterA, isianSepeda({ startDate: '2026-11-23' }));
+
+    expect(sewa.startDate).toBe('2026-11-23');
+    expect(sewa.endDate).toBe('2026-11-26');
+    expect(sewa.totalCost).toBe(30000);
+    expect(sewa.statusLabel).toBe('Belum mulai');
+    expect(sewa.isActive).toBe(true);
+
+    const baris = await prisma.rental.findFirstOrThrow({ where: { renterId: renterA } });
+    expect(toIsoDate(baris.startDate)).toBe('2026-11-23');
+    expect(toIsoDate(baris.endDate)).toBe('2026-11-26');
+    expect((await prisma.garage.findUniqueOrThrow({ where: { id: 'S001' } })).status).toBe('USED');
+
+    // Garasi untuk masa depan tidak ditawarkan kepada penyewa lain.
+    const pilihan = await layanan.getNewRentalOptions();
+    expect(pilihan.garages.map((g) => g.id)).not.toContain('S001');
+    await expect(
+      layanan.createRental(renterB, isianSepeda({ startDate: '2026-12-20' })),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    // Sewa yang belum mulai tampil dengan status "Belum mulai" di daftar penyewa.
+    const daftar = await layanan.listMyRentals(renterA);
+    expect(daftar[0].statusLabel).toBe('Belum mulai');
+  });
+
+  it('harian yang melewati batas bulan dan tahun dihitung dari tanggal mulai', async () => {
+    const layanan = layananDenganJam(JAM_TETAP);
+    const akhirBulan = await layanan.createRental(
+      renterA,
+      isianSepeda({ garageId: 'S001', startDate: '2026-11-30', days: '5' }),
+    );
+    expect(akhirBulan.endDate).toBe('2026-12-05');
+
+    const akhirTahun = await layanan.createRental(
+      renterA,
+      isianSepeda({ garageId: 'S002', startDate: '2026-12-31', days: '2' }),
+    );
+    expect(akhirTahun.endDate).toBe('2027-01-02');
+  });
+
+  it('bulanan memakai jumlah hari bulan tanggal mulai (30, 31, 28 hari)', async () => {
+    const layanan = layananDenganJam(JAM_TETAP);
+    const kasus: Array<[string, string, string]> = [
+      ['S001', '2026-11-30', '2026-12-30'], // November 30 hari
+      ['S002', '2026-12-31', '2027-01-31'], // Desember 31 hari
+      ['C001', '2027-02-10', '2027-03-10'], // Februari 28 hari
+    ];
+    for (const [garageId, mulai, akhir] of kasus) {
+      const mobil = garageId === 'C001';
+      const sewa = await layanan.createRental(
+        renterA,
+        isianSepeda({
+          rentalType: 'BULANAN',
+          days: undefined,
+          vehicleType: mobil ? 'MOBIL' : 'SEPEDA',
+          plateNumber: mobil ? 'B 1 A' : undefined,
+          garageType: mobil ? 'CAR' : 'BICYCLE',
+          garageId,
+          startDate: mulai,
+        }),
+      );
+      expect(sewa.startDate).toBe(mulai);
+      expect(sewa.endDate).toBe(akhir);
+    }
+  });
+
+  it('mulai Februari tahun kabisat: bulanan 29 hari, harian maksimal 28 hari', async () => {
+    const layanan = layananDenganJam(new Date('2028-01-15T03:00:00Z'));
+    const bulanan = await layanan.createRental(
+      renterA,
+      isianSepeda({ rentalType: 'BULANAN', days: undefined, startDate: '2028-02-10' }),
+    );
+    expect(bulanan.endDate).toBe('2028-03-10');
+    expect(bulanan.totalCost).toBe(250000);
+
+    const harian = await layanan.createRental(
+      renterA,
+      isianSepeda({ garageId: 'S002', startDate: '2028-02-10', days: '28' }),
+    );
+    expect(harian.endDate).toBe('2028-03-09');
+    expect(harian.totalCost).toBe(280000);
+
+    const galat = await galatValidasiDengan(layanan, { startDate: '2028-02-10', days: '29' });
+    expect(galat.fieldErrors.days?.[0]).toBe('Jumlah hari maksimal 28 untuk bulan mulai sewa');
+  });
+
+  it('batas hari harian mengikuti bulan tanggal mulai, bukan bulan hari ini', async () => {
+    const layanan = layananDenganJam(JAM_TETAP); // November: batas bila mulai hari ini 29
+    // Februari 2027 (28 hari): 27 boleh, 28 ditolak.
+    const galat = await galatValidasiDengan(layanan, { startDate: '2027-02-10', days: '28' });
+    expect(galat.fieldErrors.days?.[0]).toBe('Jumlah hari maksimal 27 untuk bulan mulai sewa');
+    await pastikanTidakAdaYangTersimpan();
+
+    const sewa = await layanan.createRental(
+      renterA,
+      isianSepeda({ startDate: '2027-02-10', days: '27' }),
+    );
+    expect(sewa.endDate).toBe('2027-03-09');
+    expect(sewa.totalCost).toBe(270000);
+
+    // Desember (31 hari): 30 hari boleh walau bulan hari ini hanya mengizinkan 29.
+    const desember = await layanan.createRental(
+      renterA,
+      isianSepeda({ garageId: 'S002', startDate: '2026-12-01', days: '30' }),
+    );
+    expect(desember.endDate).toBe('2026-12-31');
+  });
+
+  it('menolak tanggal mulai kemarin (server memakai hari ini sendiri)', async () => {
+    const galat = await galatValidasiDengan(layananDenganJam(JAM_TETAP), {
+      startDate: '2026-11-21',
+    });
+    expect(galat.fieldErrors.startDate?.[0]).toBe('Tanggal mulai tidak boleh sebelum hari ini');
+    await pastikanTidakAdaYangTersimpan();
+  });
+
+  it('mengikuti tanggal Jakarta: pukul 00.30 WIB sudah hari berikutnya', async () => {
+    // 21 November 17:30 UTC = 22 November 00:30 WIB.
+    const layanan = layananDenganJam(new Date('2026-11-21T17:30:00Z'));
+    const galat = await galatValidasiDengan(layanan, { startDate: '2026-11-21' });
+    expect(galat.fieldErrors.startDate).toBeDefined();
+    const sewa = await layanan.createRental(renterA, isianSepeda({ startDate: '2026-11-22' }));
+    expect(sewa.startDate).toBe('2026-11-22');
+  });
+
+  it('menerima tepat satu tahun ke depan, menolak lebih dari itu', async () => {
+    const layanan = layananDenganJam(JAM_TETAP);
+    const galat = await galatValidasiDengan(layanan, { startDate: '2027-11-23' });
+    expect(galat.fieldErrors.startDate?.[0]).toBe(
+      'Tanggal mulai paling jauh satu tahun dari hari ini',
+    );
+    await pastikanTidakAdaYangTersimpan();
+
+    const sewa = await layanan.createRental(renterA, isianSepeda({ startDate: '2027-11-22' }));
+    expect(sewa.startDate).toBe('2027-11-22');
+  });
+
+  it('menolak format tanggal yang tidak sah', async () => {
+    const layanan = layananDenganJam(JAM_TETAP);
+    for (const salah of ['23-11-2026', '2026-02-30', 'besok', '2026-11-23T00:00:00Z']) {
+      const galat = await galatValidasiDengan(layanan, { startDate: salah });
+      expect(galat.fieldErrors.startDate?.[0]).toBe('Tanggal mulai harus tanggal yang sah');
+    }
+    await pastikanTidakAdaYangTersimpan();
   });
 });

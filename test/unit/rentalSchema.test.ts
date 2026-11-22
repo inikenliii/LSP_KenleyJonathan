@@ -3,6 +3,7 @@
  * mobil listrik.
  */
 import { describe, expect, it } from 'vitest';
+import { parseIsoDate } from '@/domain';
 import { createRentalSchema } from '@/validation/rentalSchemas';
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
@@ -29,7 +30,7 @@ function isianListrik(override: Record<string, unknown> = {}): Record<string, un
   };
 }
 
-const schema = createRentalSchema(30);
+const schema = createRentalSchema(parseIsoDate('2026-11-22'));
 
 /**
  * Mengambil pesan error pertama suatu field dari hasil validasi.

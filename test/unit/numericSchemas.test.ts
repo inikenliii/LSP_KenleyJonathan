@@ -4,6 +4,7 @@
  * `z.coerce.number()`.
  */
 import { describe, expect, it } from 'vitest';
+import { parseIsoDate } from '@/domain';
 import { garageBatchSchema } from '@/validation/garageSchemas';
 import { createRentalSchema } from '@/validation/rentalSchemas';
 import { reportMonthSchema, reportYearSchema } from '@/validation/reportSchemas';
@@ -77,7 +78,8 @@ describe('garageBatchSchema: angka ketat', () => {
 });
 
 describe('createRentalSchema: jumlah hari ketat', () => {
-  const schema = createRentalSchema(30);
+  // 5 Januari: bulan 31 hari sehingga batas sewa harian 30 hari.
+  const schema = createRentalSchema(parseIsoDate('2026-01-05'));
   const harian = {
     vehicleType: 'SEPEDA',
     vehicleBrand: 'Polygon',
@@ -109,7 +111,7 @@ describe('createRentalSchema: jumlah hari ketat', () => {
       'Jumlah hari paling sedikit 1',
     );
     expect(pesanField(schema.safeParse({ ...harian, days: '31' }), 'days')).toBe(
-      'Jumlah hari maksimal 30 untuk bulan ini',
+      'Jumlah hari maksimal 30 untuk bulan mulai sewa',
     );
   });
 });
