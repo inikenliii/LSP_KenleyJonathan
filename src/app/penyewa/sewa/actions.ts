@@ -12,11 +12,13 @@ import { rentalService } from '@/lib/container';
 /**
  * Membuat sewa baru. Server Action adalah endpoint POST yang bisa dipanggil
  * langsung, jadi peran Penyewa diperiksa lebih dulu. Id penyewa diambil dari
- * sesi; tanggal, status, dan biaya dihitung layanan, tidak pernah dari formulir.
+ * sesi; tanggal berakhir, status, dan biaya dihitung layanan, tidak pernah dari
+ * formulir. Tanggal mulai dari formulir diperiksa ulang oleh layanan (tidak boleh
+ * sebelum hari ini menurut server).
  *
  * @param _previous Hasil sebelumnya (tidak dipakai).
- * @param formData Data formulir: data kendaraan, tipe sewa, jumlah hari, tipe
- *   dan ID garasi, serta berkas `paymentProof`.
+ * @param formData Data formulir: data kendaraan, tipe sewa, jumlah hari, tanggal
+ *   mulai, tipe dan ID garasi, serta berkas `paymentProof`.
  * @returns Pesan error per field bila gagal; bila berhasil pengguna dialihkan
  *   ke daftar sewa.
  */
@@ -34,6 +36,7 @@ export async function createRentalAction(
     'remainingKwh',
     'rentalType',
     'days',
+    'startDate',
     'garageType',
     'garageId',
   ]);

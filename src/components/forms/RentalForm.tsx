@@ -1,6 +1,13 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type MouseEvent,
+} from 'react';
 import { createRentalAction } from '@/app/penyewa/sewa/actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -24,6 +31,7 @@ import {
   formatRupiah,
   formatTanggal,
   kwhToCharge,
+  maxDailyDays as maxDailyDaysFor,
   parseIsoDate,
   type GarageTypeCode,
   type RentalCostBreakdown,
@@ -72,18 +80,42 @@ function previewKwhToCharge(batteryKwh: string, remainingKwh: string): number | 
 }
 
 /**
- * Menghitung tanggal berakhir untuk pratinjau dengan fungsi domain yang sama
- * dengan server.
+ * Membaca isian tanggal mulai menjadi tanggal-saja. Tanggal di luar rentang
+ * yang diizinkan dianggap belum sah (server tetap memeriksa ulang).
  *
- * @param today Tanggal mulai `YYYY-MM-DD`.
+ * @param startDate Isian tanggal mulai `YYYY-MM-DD`.
+ * @param min Tanggal paling awal (hari ini), `YYYY-MM-DD`.
+ * @param max Tanggal paling akhir (satu tahun dari hari ini), `YYYY-MM-DD`.
+ * @returns Tanggalnya, atau `null` bila kosong, tidak sah, atau di luar rentang.
+ */
+function parseStartDate(startDate: string, min: string, max: string): Date | null {
+  // Teks `YYYY-MM-DD` dapat dibandingkan langsung sebagai teks.
+  if (startDate < min || startDate > max) {
+    return null;
+  }
+  try {
+    return parseIsoDate(startDate);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Menghitung tanggal berakhir untuk pratinjau dengan fungsi domain yang sama
+ * dengan server, dari tanggal mulai yang dipilih.
+ *
+ * @param start Tanggal mulai (sudah dibaca), atau `null` bila belum sah.
  * @param rentalType Tipe sewa.
  * @param days Isian jumlah hari (teks).
  * @returns Tanggal berakhir dalam Bahasa Indonesia, atau `null` bila isian belum sah.
  */
-function previewEndDate(today: string, rentalType: RentalTypeCode, days: string): string | null {
+function previewEndDate(start: Date | null, rentalType: RentalTypeCode, days: string): string | null {
+  if (start === null) {
+    return null;
+  }
   try {
     const jumlah = days.trim() === '' ? null : Number(days);
-    return formatTanggal(computeEndDate(parseIsoDate(today), rentalType, jumlah));
+    return formatTanggal(computeEndDate(start, rentalType, jumlah));
   } catch {
     return null;
   }
@@ -92,12 +124,14 @@ function previewEndDate(today: string, rentalType: RentalTypeCode, days: string)
 /**
  * Menghitung pratinjau biaya dengan `calculateRentalCost` yang sama dengan
  * server. Nilai ini hanya tampilan; server menghitung ulang dari harga
- * database.
+ * database. Bulan tanggal mulai menentukan batas hari sewa harian, sehingga
+ * jumlah hari yang melebihi batas itu tidak dipratinjau (server menolaknya).
  *
  * @param input Pilihan saat ini di formulir.
  * @param input.vehicleType Tipe kendaraan.
  * @param input.rentalType Tipe sewa.
  * @param input.days Isian jumlah hari (teks).
+ * @param input.start Tanggal mulai yang dipilih, atau `null` bila belum sah.
  * @param input.batteryKwh Isian kapasitas baterai (teks).
  * @param input.remainingKwh Isian sisa baterai (teks).
  * @param input.garage Garasi yang dipilih, atau `undefined` bila belum ada.
@@ -107,12 +141,16 @@ function previewCost(input: {
   vehicleType: VehicleTypeCode;
   rentalType: RentalTypeCode;
   days: string;
+  start: Date | null;
   batteryKwh: string;
   remainingKwh: string;
   garage: AvailableGarageOption | undefined;
 }): RentalCostBreakdown | null {
-  const { garage } = input;
-  if (garage === undefined) {
+  const { garage, start } = input;
+  if (garage === undefined || start === null) {
+    return null;
+  }
+  if (input.rentalType === 'HARIAN' && Number(input.days) > maxDailyDaysFor(start)) {
     return null;
   }
   const chargesBattery = VehicleFactory.create(input.vehicleType).chargesBatteryIn(garage.type);
@@ -137,7 +175,9 @@ function previewCost(input: {
 
 /**
  * Formulir sewa baru: data kendaraan, tipe sewa, tipe dan ID garasi, serta
- * unggahan bukti pembayaran. Field yang tidak berlaku disembunyikan, tanggal
+ * unggahan bukti pembayaran. Tanggal mulai bisa dipilih mulai hari ini sampai
+ * satu tahun ke depan (tidak bisa kemarin). Field yang tidak berlaku disembunyikan,
+ * batas jumlah hari harian mengikuti bulan tanggal mulai, tanggal
  * berakhir dan biaya dipratinjau di browser dengan fungsi domain yang sama
  * dengan server, dan pesan error server tampil di bawah field masing-masing.
  *
@@ -146,21 +186,18 @@ function previewCost(input: {
  * ringkasan biaya selalu sesuai dengan isian yang terkirim. Hanya kotak berkas yang
  * dikosongkan setelah galat karena berkas tidak bisa dipulihkan.
  *
- * @param props.today Tanggal mulai (hari ini di Jakarta), `YYYY-MM-DD`.
- * @param props.todayLabel Tanggal mulai dalam Bahasa Indonesia.
- * @param props.maxDailyDays Batas jumlah hari sewa harian bulan ini.
+ * @param props.today Hari ini di Jakarta, `YYYY-MM-DD`: nilai awal dan batas paling awal tanggal mulai.
+ * @param props.maxStartDate Tanggal mulai paling akhir (satu tahun dari hari ini), `YYYY-MM-DD`.
  * @param props.garages Garasi yang tersedia beserta harganya.
  * @returns Formulir dengan tombol "Simpan" dan kotak pesan hasil.
  */
 export function RentalForm({
   today,
-  todayLabel,
-  maxDailyDays,
+  maxStartDate,
   garages,
 }: {
   today: string;
-  todayLabel: string;
-  maxDailyDays: number;
+  maxStartDate: string;
   garages: ReadonlyArray<AvailableGarageOption>;
 }) {
   const [state, formAction, pending] = useActionState(createRentalAction, INITIAL_ACTION_STATE);
@@ -174,6 +211,7 @@ export function RentalForm({
     RENTAL_TYPE_CODES.find((kode) => kode === awal?.rentalType) ?? 'HARIAN',
   );
   const [days, setDays] = useState(awal?.days ?? '');
+  const [startDate, setStartDate] = useState(awal?.startDate ?? today);
   const [garageType, setGarageType] = useState<GarageTypeCode>(
     () =>
       VehicleFactory.create(vehicleType)
@@ -202,11 +240,14 @@ export function RentalForm({
   const vehicle = VehicleFactory.create(vehicleType);
   const garageOptions = garages.filter((garasi) => garasi.type === garageType);
   const selectedGarage = garageOptions.find((garasi) => garasi.id === garageId);
-  const endDateLabel = previewEndDate(today, rentalType, days);
+  const start = parseStartDate(startDate, today, maxStartDate);
+  const maxDailyDays = start === null ? null : maxDailyDaysFor(start);
+  const endDateLabel = previewEndDate(start, rentalType, days);
   const cost = previewCost({
     vehicleType,
     rentalType,
     days,
+    start,
     batteryKwh,
     remainingKwh,
     garage: selectedGarage,
@@ -235,6 +276,21 @@ export function RentalForm({
   function handleGarageTypeChange(event: ChangeEvent<HTMLSelectElement>) {
     setGarageType(event.target.value as GarageTypeCode);
     setGarageId('');
+  }
+
+  /**
+   * Membuka kalender bawaan peramban saat bagian mana pun dari kotak tanggal
+   * diklik (bawaannya hanya ikon kalender yang membukanya). Peramban yang belum
+   * mendukung `showPicker` tetap memakai perilaku bawaan.
+   *
+   * @param event Klik pada kotak tanggal mulai.
+   */
+  function handleStartDateClick(event: MouseEvent<HTMLInputElement>) {
+    try {
+      event.currentTarget.showPicker();
+    } catch {
+      // showPicker tidak tersedia atau ditolak: kotak tanggal tetap bisa diisi dengan papan ketik.
+    }
   }
 
   /**
@@ -394,7 +450,7 @@ export function RentalForm({
               type="number"
               onWheel={(event) => event.currentTarget.blur()}
               min={1}
-              max={maxDailyDays}
+              max={maxDailyDays ?? undefined}
               value={days}
               onChange={(event) => setDays(event.target.value)}
               aria-invalid={galat.days?.[0] ? true : undefined}
@@ -402,14 +458,36 @@ export function RentalForm({
             {galat.days?.[0] ? (
               <FieldError>{galat.days[0]}</FieldError>
             ) : (
-              <FieldDescription>Maksimal {maxDailyDays} hari untuk bulan ini</FieldDescription>
+              <FieldDescription>
+                {maxDailyDays === null
+                  ? 'Pilih tanggal mulai yang sah untuk melihat batas hari'
+                  : `Maksimal ${maxDailyDays} hari untuk bulan tanggal mulai`}
+              </FieldDescription>
             )}
           </Field>
         )}
 
-        <Field>
+        <Field data-invalid={galat.startDate?.[0] ? true : undefined}>
           <FieldLabel htmlFor="startDate">Tanggal Mulai</FieldLabel>
-          <Input id="startDate" value={todayLabel} readOnly />
+          <Input
+            id="startDate"
+            name="startDate"
+            type="date"
+            min={today}
+            max={maxStartDate}
+            value={startDate}
+            onChange={(event) => setStartDate(event.target.value)}
+            onClick={handleStartDateClick}
+            className="cursor-pointer"
+            aria-invalid={galat.startDate?.[0] ? true : undefined}
+          />
+          {galat.startDate?.[0] ? (
+            <FieldError>{galat.startDate[0]}</FieldError>
+          ) : (
+            <FieldDescription>
+              Mulai hari ini sampai satu tahun ke depan; tidak bisa memilih tanggal yang sudah lewat.
+            </FieldDescription>
+          )}
         </Field>
 
         <Field>

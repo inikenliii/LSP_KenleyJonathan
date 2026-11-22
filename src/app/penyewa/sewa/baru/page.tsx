@@ -29,8 +29,7 @@ export default async function NewRentalPage() {
           <CardContent>
             <RentalForm
               today={options.today}
-              todayLabel={options.todayLabel}
-              maxDailyDays={options.maxDailyDays}
+              maxStartDate={options.maxStartDate}
               garages={options.garages}
             />
           </CardContent>

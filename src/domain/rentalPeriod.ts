@@ -116,6 +116,19 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /**
+ * Tanggal mulai paling akhir yang boleh dipilih: satu tahun setelah hari ini.
+ * Bila hari ini 29 Februari dan tahun depan bukan kabisat, hasilnya 1 Maret.
+ *
+ * @param today Tanggal hari ini di Jakarta (tanggal-saja).
+ * @returns Tanggal mulai terjauh yang diizinkan.
+ * @example
+ * toIsoDate(latestStartDate(parseIsoDate('2026-11-22'))); // "2027-11-22"
+ */
+export function latestStartDate(today: Date): Date {
+  return new Date(Date.UTC(today.getUTCFullYear() + 1, today.getUTCMonth(), today.getUTCDate()));
+}
+
+/**
  * Menghitung tanggal berakhir sewa.
  *
  * - HARIAN: mulai + jumlah hari (1 sampai `maxDailyDays(start)`).

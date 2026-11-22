@@ -1,6 +1,13 @@
 /**
  * @file Layanan sewa: aturan bisnis sewa baru (kecocokan kendaraan dan garasi,
  * ketersediaan, tanggal, biaya, bukti pembayaran) dan tampilan sewa penyewa.
+ *
+ * Tanggal mulai boleh hari ini sampai satu tahun ke depan, tidak boleh
+ * kemarin; tanggal berakhir selalu dihitung server dari tanggal mulai itu.
+ * Asumsi sederhana: garasi langsung berstatus used begitu disewa, juga untuk
+ * tanggal mulai di masa depan. Garasi baru dilepas oleh pelepasan yang sudah
+ * ada, yaitu saat semua sewanya berakhir sebelum hari ini, sehingga garasi
+ * yang disewa untuk masa depan tidak tersedia bagi penyewa lain sementara itu.
  */
 import {
   ConflictError,
@@ -15,7 +22,7 @@ import {
   detectProofImageType,
   formatTanggal,
   isRentalActive,
-  maxDailyDays,
+  latestStartDate,
   toAppError,
   toIsoDate,
   todayInJakarta,
@@ -43,12 +50,10 @@ export interface AvailableGarageOption {
 
 /** Data awal formulir sewa baru. */
 export interface NewRentalOptions {
-  /** Tanggal mulai (hari ini di Jakarta), format `YYYY-MM-DD`. */
+  /** Hari ini di Jakarta, format `YYYY-MM-DD`: nilai bawaan dan batas paling awal tanggal mulai. */
   today: string;
-  /** Tanggal mulai dalam Bahasa Indonesia. */
-  todayLabel: string;
-  /** Batas jumlah hari sewa harian bulan ini. */
-  maxDailyDays: number;
+  /** Tanggal mulai paling akhir yang diizinkan (satu tahun dari hari ini), format `YYYY-MM-DD`. */
+  maxStartDate: string;
   /** Garasi yang tersedia, urut menurut ID. */
   garages: AvailableGarageOption[];
 }
@@ -99,7 +104,7 @@ export interface RentalView {
   grandTotal: number;
   /** Apakah sewa masih berlaku. */
   isActive: boolean;
-  /** "Aktif" atau "Selesai". */
+  /** "Belum mulai", "Aktif", atau "Selesai". */
   statusLabel: string;
 }
 
@@ -136,7 +141,7 @@ export interface ProofViewer {
 /** Kontrak layanan sewa. */
 export interface IRentalService {
   /**
-   * Menyiapkan data formulir sewa baru: tanggal mulai, batas hari, dan garasi tersedia.
+   * Menyiapkan data formulir sewa baru: batas tanggal mulai dan garasi tersedia.
    *
    * @returns Pilihan untuk formulir.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
@@ -193,8 +198,8 @@ export class RentalService implements IRentalService {
   ) {}
 
   /**
-   * Melepas garasi yang sewanya sudah berakhir, lalu mengembalikan tanggal
-   * mulai, batas hari, dan garasi yang tersedia.
+   * Melepas garasi yang sewanya sudah berakhir, lalu mengembalikan batas
+   * tanggal mulai (hari ini sampai satu tahun ke depan) dan garasi yang tersedia.
    *
    * @returns Pilihan untuk formulir sewa baru.
    * @throws {DatabaseError} Bila terjadi kegagalan tak terduga.
@@ -206,8 +211,7 @@ export class RentalService implements IRentalService {
       const baris = await this.rentals.findAvailableGarages();
       return {
         today: toIsoDate(today),
-        todayLabel: formatTanggal(today),
-        maxDailyDays: maxDailyDays(today),
+        maxStartDate: toIsoDate(latestStartDate(today)),
         garages: baris.map((row) => {
           const garage = GarageFactory.create(row.type, row.id, row.status);
           return {
@@ -225,8 +229,11 @@ export class RentalService implements IRentalService {
   }
 
   /**
-   * Membuat sewa baru. Tanggal, biaya, dan harga dihitung server dari data
-   * database; berkas bukti disimpan setelah semua pemeriksaan lolos dan
+   * Membuat sewa baru. Tanggal mulai dari formulir diperiksa ulang terhadap
+   * hari ini menurut server (tidak boleh kemarin, paling jauh satu tahun
+   * ke depan); tanggal berakhir, biaya, dan harga dihitung server dari data
+   * database. Garasi langsung berstatus used walau tanggal mulai di masa depan
+   * (lihat catatan di bagian atas berkas). Berkas bukti disimpan setelah semua pemeriksaan lolos dan
    * dihapus lagi bila penyimpanan sewa gagal.
    *
    * @param renterId Id penyewa dari sesi.
@@ -238,7 +245,7 @@ export class RentalService implements IRentalService {
    */
   async createRental(renterId: number, input: unknown): Promise<RentalView> {
     const today = todayInJakarta(this.clock());
-    const data = parseInput(createRentalSchema(maxDailyDays(today)), input);
+    const data = parseInput(createRentalSchema(today), input);
     const vehicle = VehicleFactory.create(data.vehicleType);
     const proofType = detectProofImageType(data.paymentProof) as ProofImageType;
 
@@ -259,7 +266,7 @@ export class RentalService implements IRentalService {
       if (chargesBattery && garage.pricePerKwh === null) {
         throw new ConflictError('Harga per kWh belum diatur');
       }
-      const endDate = computeEndDate(today, data.rentalType, data.days);
+      const endDate = computeEndDate(data.startDate, data.rentalType, data.days);
       const biaya = calculateRentalCost({
         rentalType: data.rentalType,
         days: data.rentalType === 'HARIAN' ? (data.days ?? null) : null,
@@ -282,7 +289,7 @@ export class RentalService implements IRentalService {
         remainingKwh: vehicle.requiresBattery() ? (data.remainingKwh ?? null) : null,
         rentalType: data.rentalType,
         days: data.rentalType === 'HARIAN' ? (data.days ?? null) : null,
-        startDate: today,
+        startDate: data.startDate,
         endDate,
         dailyPrice: garage.dailyPrice,
         pricePerKwh: chargesBattery ? garage.pricePerKwh : null,
@@ -351,6 +358,7 @@ export class RentalService implements IRentalService {
    */
   private toView(row: RentalRecord, today: Date): RentalView {
     const aktif = isRentalActive(row.endDate, today);
+    const belumMulai = row.startDate.getTime() > today.getTime();
     const extensionTotal = row.extensions.reduce((jumlah, item) => jumlah + item.amount, 0);
     return {
       id: row.id,
@@ -381,7 +389,7 @@ export class RentalService implements IRentalService {
       extensionTotal,
       grandTotal: row.totalCost + extensionTotal,
       isActive: aktif,
-      statusLabel: aktif ? 'Aktif' : 'Selesai',
+      statusLabel: !aktif ? 'Selesai' : belumMulai ? 'Belum mulai' : 'Aktif',
     };
   }
 }

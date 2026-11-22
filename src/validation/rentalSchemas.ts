@@ -1,11 +1,22 @@
 /**
  * @file Skema validasi (Zod) untuk sewa baru beserta pesan Bahasa Indonesia.
  *
- * Skema sengaja tidak memuat id penyewa, status, harga, atau tanggal: nilai
- * itu selalu dihitung server, dan kunci yang tidak dikenal dibuang.
+ * Skema sengaja tidak memuat id penyewa, status, harga, atau tanggal berakhir:
+ * nilai itu selalu dihitung server, dan kunci yang tidak dikenal dibuang.
+ * Satu-satunya tanggal dari klien adalah tanggal mulai, yang diperiksa ulang
+ * terhadap tanggal hari ini milik server.
  */
 import { z } from 'zod';
-import { GARAGE_TYPE_CODES, RENTAL_TYPE_CODES, VEHICLE_TYPE_CODES, VehicleFactory } from '@/domain';
+import {
+  GARAGE_TYPE_CODES,
+  RENTAL_TYPE_CODES,
+  VEHICLE_TYPE_CODES,
+  VehicleFactory,
+  latestStartDate,
+  maxDailyDays,
+  parseIsoDate,
+  toIsoDate,
+} from '@/domain';
 import { paymentProofSchema } from './paymentProofSchema';
 import { wholeNumber } from './wholeNumber';
 
@@ -15,16 +26,59 @@ const PESAN_BATERAI = 'Kapasitas baterai berupa angka positif dengan paling bany
 /** Pesan untuk sisa baterai yang bukan angka nol atau lebih dengan satu desimal. */
 const PESAN_SISA = 'Sisa baterai berupa angka nol atau lebih dengan paling banyak satu desimal';
 
+/** Pesan untuk tanggal mulai yang bukan tanggal kalender `YYYY-MM-DD` yang sah. */
+const PESAN_TANGGAL = 'Tanggal mulai harus tanggal yang sah';
+
+/** Pesan untuk tanggal mulai yang sudah lewat. */
+const PESAN_TANGGAL_LAMPAU = 'Tanggal mulai tidak boleh sebelum hari ini';
+
+/** Pesan untuk tanggal mulai yang lebih dari satu tahun ke depan. */
+const PESAN_TANGGAL_JAUH = 'Tanggal mulai paling jauh satu tahun dari hari ini';
+
+/**
+ * Membuat skema tanggal mulai: teks `YYYY-MM-DD` yang sah, tidak sebelum
+ * `today`, dan tidak lebih dari satu tahun setelah `today`. Hasilnya `Date`
+ * tanggal-saja (UTC tengah malam).
+ *
+ * @param today Tanggal hari ini menurut server (tanggal-saja).
+ * @returns Skema Zod tanggal mulai.
+ */
+function startDateSchema(today: Date) {
+  const terjauh = latestStartDate(today);
+  return z
+    .string({ error: PESAN_TANGGAL })
+    .transform((teks, ctx) => {
+      let tanggal: Date;
+      try {
+        tanggal = parseIsoDate(teks);
+      } catch {
+        ctx.issues.push({ code: 'custom', message: PESAN_TANGGAL, input: teks });
+        return z.NEVER;
+      }
+      if (tanggal.getTime() < today.getTime()) {
+        ctx.issues.push({ code: 'custom', message: PESAN_TANGGAL_LAMPAU, input: teks });
+        return z.NEVER;
+      }
+      if (tanggal.getTime() > terjauh.getTime()) {
+        ctx.issues.push({ code: 'custom', message: PESAN_TANGGAL_JAUH, input: teks });
+        return z.NEVER;
+      }
+      return tanggal;
+    });
+}
+
 /**
  * Merapikan isian formulir sebelum divalidasi: teks dipangkas, isian kosong
  * dianggap tidak diisi, plat dijadikan huruf besar tanpa spasi ganda, koma
- * desimal kapasitas dan sisa baterai diganti titik, dan isian yang tidak
- * berlaku untuk tipe kendaraan atau tipe sewa dibuang.
+ * desimal kapasitas dan sisa baterai diganti titik, isian yang tidak
+ * berlaku untuk tipe kendaraan atau tipe sewa dibuang, dan tanggal mulai
+ * yang kosong atau tidak dikirim diisi dengan hari ini.
  *
  * @param body Isi formulir mentah.
+ * @param today Tanggal hari ini menurut server (tanggal-saja).
  * @returns Isian yang sudah dirapikan.
  */
-function normalizeRentalInput(body: unknown): unknown {
+function normalizeRentalInput(body: unknown, today: Date): unknown {
   if (typeof body !== 'object' || body === null) {
     return {};
   }
@@ -58,19 +112,26 @@ function normalizeRentalInput(body: unknown): unknown {
   if (input.rentalType !== 'HARIAN') {
     input.days = undefined;
   }
+  if (input.startDate === undefined) {
+    input.startDate = toIsoDate(today);
+  }
   return input;
 }
 
 /**
  * Membuat skema sewa baru.
  *
- * @param maxDays Batas jumlah hari sewa harian untuk bulan ini (hari dalam bulan dikurangi satu).
+ * Tanggal mulai boleh hari ini sampai satu tahun ke depan (tidak boleh
+ * kemarin). Batas jumlah hari sewa harian mengikuti bulan tanggal mulai
+ * (hari dalam bulan itu dikurangi satu), bukan bulan hari ini.
+ *
+ * @param today Tanggal hari ini menurut server (tanggal-saja, lihat `todayInJakarta`);
+ *   dipakai sebagai batas bawah tanggal mulai dan nilai bawaan bila tidak diisi.
  * @returns Skema Zod untuk isian sewa baru.
  */
-export function createRentalSchema(maxDays: number) {
-  const pesanHari = `Jumlah hari maksimal ${maxDays} untuk bulan ini`;
+export function createRentalSchema(today: Date) {
   return z.preprocess(
-    normalizeRentalInput,
+    (body) => normalizeRentalInput(body, today),
     z
       .object({
         vehicleType: z.enum(VEHICLE_TYPE_CODES, { error: 'Pilih tipe kendaraan' }),
@@ -98,13 +159,9 @@ export function createRentalSchema(maxDays: number) {
           .optional(),
         rentalType: z.enum(RENTAL_TYPE_CODES, { error: 'Pilih tipe sewa' }),
         days: wholeNumber('Jumlah hari wajib diisi angka', 'Jumlah hari harus bilangan bulat')
-          .pipe(
-            z
-              .number()
-              .min(1, { error: 'Jumlah hari paling sedikit 1' })
-              .max(maxDays, { error: pesanHari }),
-          )
+          .pipe(z.number().min(1, { error: 'Jumlah hari paling sedikit 1' }))
           .optional(),
+        startDate: startDateSchema(today),
         garageType: z.enum(GARAGE_TYPE_CODES, { error: 'Pilih tipe garasi' }),
         garageId: z
           .string({ error: 'Pilih garasi yang tersedia' })
@@ -150,6 +207,20 @@ export function createRentalSchema(maxDays: number) {
       .refine((data) => data.rentalType !== 'HARIAN' || data.days !== undefined, {
         path: ['days'],
         error: 'Jumlah hari wajib diisi untuk sewa harian',
+      })
+      .superRefine((data, ctx) => {
+        // Tanggal mulai yang gagal diparse sudah punya pesan sendiri; lewati pemeriksaan hari.
+        if (!(data.startDate instanceof Date)) {
+          return;
+        }
+        const batas = maxDailyDays(data.startDate);
+        if (data.days !== undefined && data.days > batas) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['days'],
+            message: `Jumlah hari maksimal ${batas} untuk bulan mulai sewa`,
+          });
+        }
       })
       .refine((data) => VehicleFactory.create(data.vehicleType).canParkIn(data.garageType), {
         path: ['garageType'],
